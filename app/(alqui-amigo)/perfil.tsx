@@ -123,20 +123,26 @@ export default function PerfilAlquiAmigoScreen() {
     return estrellas;
   };
 
+  // --- FUNCIÓN MODIFICADA PARA MOSTRAR AM/PM ---
   const renderHorarios = () => {
     if (!perfil?.disponibilidadHoraria) return <Text style={styles.textoNormal}>No hay horarios configurados.</Text>;
 
     return ORDEN_DIAS.map((dia) => {
       const horario = perfil.disponibilidadHoraria[dia];
-      if (!horario) return null;
+      // Si el día no está activo o no existe, no lo mostramos (o podrías mostrar "No disponible")
+      if (!horario || horario.activo === false) return null;
 
       const nombreDia = dia.charAt(0).toUpperCase() + dia.slice(1);
+      
+      // Obtenemos el periodo y lo convertimos a mayúsculas (am -> AM)
+      const pInicio = horario.inicioPeriodo ? horario.inicioPeriodo.toUpperCase() : '';
+      const pFin = horario.finPeriodo ? horario.finPeriodo.toUpperCase() : '';
 
       return (
         <View key={dia} style={styles.filaHorario}>
           <Text style={styles.textoDia}>{nombreDia}</Text>
           <Text style={styles.textoHora}>
-            {horario.inicio} - {horario.fin}
+            {horario.inicio} {pInicio} - {horario.fin} {pFin}
           </Text>
         </View>
       );

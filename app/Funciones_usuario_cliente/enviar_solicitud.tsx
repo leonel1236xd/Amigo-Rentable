@@ -158,7 +158,7 @@ export default function EnviarSolicitudScreen() {
       fotografia_solicitante: clienteData.fotoURL || '',
       informacion_general_solicitante: `Edad: ${calcularEdad(clienteData.fechaNacimiento)} años`,
       fecha_salida: fecha.toISOString().split('T')[0],
-      hora_salida: formatoHora(hora),
+      hora_salida: formatoHora(hora), // Usamos el nuevo formato manual
       duracion: parseInt(duracion),
       lugar_asistir: ubicacion,
       detalles_de_la_salida: mensaje,
@@ -194,8 +194,18 @@ export default function EnviarSolicitudScreen() {
     return edad;
   };
 
+  // --- NUEVA FUNCIÓN DE FORMATO HORA (12H Manual) ---
   const formatoHora = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // la hora '0' debe ser '12'
+    
+    const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+    
+    return `${hours}:${strMinutes} ${ampm}`;
   };
 
   const formatoFecha = (date: Date) => {
@@ -260,24 +270,27 @@ export default function EnviarSolicitudScreen() {
 
         <Text style={styles.labelInput}>Hora</Text>
         <TouchableOpacity style={styles.inputSelect} onPress={() => setMostrarHora(true)}>
+          {/* Aquí se mostrará "03:30 PM" */}
           <Text style={styles.textoSelect}>{formatoHora(hora)}</Text>
           <Feather name="clock" size={20} color="#000" />
         </TouchableOpacity>
+        
         {mostrarHora && (
           <DateTimePicker
             value={hora}
             mode="time"
             display="default"
+            is24Hour={false} // <--- ESTO FUERZA EL RELOJ DE 12H EN ANDROID
             onChange={onTimeChange}
           />
         )}
 
-      <Text style={styles.labelInput}>Duración (horas)</Text>
+        <Text style={styles.labelInput}>Duración (horas)</Text>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
             placeholder="Ej: 2"
-            placeholderTextColor="#888888" // <--- AGREGADO
+            placeholderTextColor="#888888"
             keyboardType="numeric"
             value={duracion}
             onChangeText={setDuracion}
@@ -323,7 +336,7 @@ export default function EnviarSolicitudScreen() {
 
       </ScrollView>
 
-      {/* --- 3. MODAL DE MENSAJES INTEGRADO --- */}
+      {/* --- MODAL DE MENSAJES INTEGRADO --- */}
       <ModalMensaje
         visible={modalVisible}
         titulo={modalDatos.titulo}

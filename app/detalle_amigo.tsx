@@ -93,20 +93,24 @@ export default function DetalleAlquiAmigoScreen() {
     });
   };
 
-  // --- COMPONENTE FILA DE HORARIO ---
+  // --- COMPONENTE FILA DE HORARIO (MODIFICADO PARA AM/PM) ---
   const renderFilaHorario = (dia: string) => {
     const horario = amigo.disponibilidadHoraria?.[dia];
     
     // Capitalizar primera letra (lunes -> Lunes)
     const diaCapitalizado = dia.charAt(0).toUpperCase() + dia.slice(1);
 
-    if (!horario) return null;
+    if (!horario || horario.activo === false) return null;
+
+    // Obtenemos los periodos y los ponemos en mayúsculas
+    const pInicio = horario.inicioPeriodo ? horario.inicioPeriodo.toUpperCase() : '';
+    const pFin = horario.finPeriodo ? horario.finPeriodo.toUpperCase() : '';
 
     return (
       <View key={dia} style={styles.filaHorario}>
         <Text style={styles.textoDia}>{diaCapitalizado}</Text>
         <Text style={styles.textoHora}>
-          {horario.inicio} - {horario.fin}
+          {horario.inicio} {pInicio} - {horario.fin} {pFin}
         </Text>
       </View>
     );
@@ -127,7 +131,7 @@ export default function DetalleAlquiAmigoScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        {/* FOTO DE PERFIL (Click para ampliar) - CAMBIO 1: Se eliminó el icono de lupa */}
+        {/* FOTO DE PERFIL (Click para ampliar) */}
         <TouchableOpacity onPress={() => setImagenModalVisible(true)} style={styles.avatarContainer}>
           <View style={styles.avatarBorder}>
             {amigo.fotoURL ? (
@@ -185,7 +189,6 @@ export default function DetalleAlquiAmigoScreen() {
           
           <View style={styles.filaContacto}>
             <Text style={styles.labelContacto}>Contacto rápido:</Text>
-            {/* CAMBIO 2: Se reemplazó Feather por FontAwesome 'whatsapp' */}
             <TouchableOpacity style={styles.botonWhatsappPequeno} onPress={enviarMensajeWhatsApp}>
                 <FontAwesome name="whatsapp" size={18} color="#FFF" style={{marginRight: 6}}/>
                 <Text style={styles.textoBotonPequeno}>Enviar mensaje</Text>
@@ -281,7 +284,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // SE ELIMINÓ EL ESTILO iconoExpandir
   nombreUsuario: {
     fontSize: 22,
     fontWeight: 'bold',
