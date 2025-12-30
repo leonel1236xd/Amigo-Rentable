@@ -58,10 +58,10 @@
           "photosPermission": "La aplicación necesita acceso a tus fotos para subir tu perfil.",
           "cameraPermission": "La aplicación necesita acceso a la cámara.",
           "android": {
-            "cropperToolbarColor": "#008FD9",
-            "cropperToolbarWidgetColor": "#FFFFFF",
-            "cropperActiveWidgetColor": "#FFFFFF",
-            "cropperStatusBarColor": "#005F99",
+            "cropperToolbarColor": "#000000", 
+            "cropperToolbarWidgetColor": "#FFFFFF", 
+            "cropperStatusBarColor": "#000000",
+            "cropperActiveWidgetColor": "#008FD9",
             "cropperToolbarTitle": "Editar Foto"
           }
         }
