@@ -16,10 +16,8 @@ import {
   
   export const enviarCalificacion = async (datos: CalificacionData) => {
     try {
+      // Con runTransaction nos aseguramos que las operaciones se ejecuten de manera automatica
       await runTransaction(db, async (transaction) => {
-        
-        // --- PASO 1: LECTURAS (READS) ---
-        // REGLA DE ORO: Todo 'get' debe ir antes de cualquier 'set' o 'update'
         
         const alquiAmigoRef = doc(db, 'alqui-amigos', datos.alqui_amigo_id);
         const alquiAmigoDoc = await transaction.get(alquiAmigoRef);
@@ -27,8 +25,6 @@ import {
         if (!alquiAmigoDoc.exists()) {
           throw new Error("El Alqui-Amigo no existe");
         }
-  
-        // --- PASO 2: CÁLCULOS EN MEMORIA ---
         
         const dataAmigo = alquiAmigoDoc.data();
         
@@ -41,12 +37,9 @@ import {
         const nuevaSuma = sumaActual + datos.estrellas;
         
         // Promedio simple: Suma Total / Cantidad Votos
-        // Usamos toFixed(1) para no tener decimales infinitos, pero guardamos como número
         const nuevoPromedio = Number((nuevaSuma / nuevaCantidad).toFixed(1));
-  
-        // --- PASO 3: ESCRITURAS (WRITES) ---
         
-        // A) Guardar la nueva calificación individual
+        //Guardar la nueva calificación individual
         const nuevaCalificacionRef = doc(collection(db, 'calificaciones'));
         transaction.set(nuevaCalificacionRef, {
           ...datos,

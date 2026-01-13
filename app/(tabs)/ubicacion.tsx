@@ -16,7 +16,7 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router'; // Importamos useRouter
+import { useRouter } from 'expo-router';
 import { auth } from '../../config/firebase'; 
 import { getUserData } from '../../services/authService';
 

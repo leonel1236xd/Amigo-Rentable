@@ -66,7 +66,7 @@ export default function DetalleAlquiAmigoScreen() {
     );
   }
 
-  // --- LÓGICA WHATSAPP ---
+  
   const enviarMensajeWhatsApp = () => {
     // Texto predeterminado amigable
     const mensaje = `Hola ${amigo.nombres}, te vi en la app Amigo Rentable y me gustaría contactar contigo.`;

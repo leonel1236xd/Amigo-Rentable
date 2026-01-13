@@ -8,13 +8,13 @@ import {
   import { db } from '../config/firebase';
   import { enviarNotificacionPush } from './notificationService';
   
-  // Interfaz basada en tu imagen de BD (image_bf2921.png)
+  // Interfaz basada en los campos necesarios para crear una nueva solicitud
   export interface NuevaSolicitud {
     cliente_id: string;
     alqui_amigo_id: string;
     nombre_solicitante: string;
     fotografia_solicitante: string;
-    informacion_general_solicitante: string; // Ej: Edad, intereses breves
+    informacion_general_solicitante: string;
     fecha_salida: string; // Formato YYYY-MM-DD
     hora_salida: string;  // Formato HH:MM
     duracion: number;     // Horas
@@ -27,15 +27,15 @@ import {
   
   export const enviarSolicitudServicio = async (datos: NuevaSolicitud) => {
     try {
-      // 1. Guardar solicitud en BD (Tu código original)
+      //Guardar solicitud en BD
       const docRef = await addDoc(collection(db, 'solicitudes'), {
         ...datos,
         fecha_creacion: Timestamp.now(),
       });
   
-      // --- 2. CÓDIGO NUEVO: NOTIFICAR AL ALQUI-AMIGO ---
+      
       try {
-        // A) Buscar datos del Alqui-Amigo para obtener su pushToken
+        
         const amigoRef = doc(db, 'alqui-amigos', datos.alqui_amigo_id);
         const amigoSnap = await getDoc(amigoRef);
   
@@ -44,7 +44,7 @@ import {
           const tokenDestino = amigoData.pushToken; // El campo que guardamos en el Login
   
           if (tokenDestino) {
-            // B) Enviar Push
+            
             await enviarNotificacionPush(
               tokenDestino, // Token del alqui-amigo
               "¡Nueva Oportunidad! 💸", // Título
@@ -55,7 +55,7 @@ import {
         }
       } catch (notifError) {
         console.error("Error enviando push (no crítico):", notifError);
-        // No hacemos return false aquí porque la solicitud sí se guardó en BD
+        
       }
       // ------------------------------------------------
   

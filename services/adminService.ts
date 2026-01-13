@@ -126,13 +126,13 @@ export const resolverDenuncia = async (
     const denunciaRef = doc(db, 'denuncias', denunciaId);
     const alquiAmigoRef = doc(db, 'alqui-amigos', alquiAmigoId);
 
-    // 1. Marcar la denuncia como "revisada" para que salga de la lista
+    //Marcar la denuncia como "revisada" para que salga de la lista
     await updateDoc(denunciaRef, {
       estado: 'revisada',
       accionTomada: accion
     });
 
-    // 2. Aplicar el castigo al usuario
+    //Aplicar el castigo al usuario
     if (accion === 'strike') {
       // Sumar 1 a las faltas
       await updateDoc(alquiAmigoRef, {
@@ -142,7 +142,7 @@ export const resolverDenuncia = async (
       // Desactivar la cuenta
       await updateDoc(alquiAmigoRef, {
         activo: false,
-        estadoCuenta: 'bloqueada' // O 'rechazada' según tu lógica
+        estadoCuenta: 'bloqueada'
       });
     }
 
