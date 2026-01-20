@@ -114,7 +114,7 @@ export default function LoginScreen() {
         }
         
       } else {
-        mostrarModal('Acceso Denegado', resultado.error || 'Credenciales incorrectas.', 'error');
+        mostrarModal('Acceso Denegado','Credenciales incorrectas.', 'error');
       }
     } catch (error: any) {
       mostrarModal('Error', error.message || 'Ocurrió un problema.', 'error');
@@ -189,6 +189,14 @@ export default function LoginScreen() {
             <Feather name={mostrarContrasena ? 'eye' : 'eye-off'} size={20} color="#666666" />
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity 
+          style={{ alignSelf: 'flex-end', marginBottom: 20 }} 
+          onPress={() => router.push('/Login/recuperar_contrasena')}
+          disabled={cargando}
+        >
+          <Text style={{ color: '#007BFF', fontWeight: '600' }}>¿Olvidaste tu contraseña?</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.loginButton, cargando && styles.loginButtonDisabled]}

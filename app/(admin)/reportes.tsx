@@ -3,41 +3,53 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Image,
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
   RefreshControl,
   Modal,
-  Alert,
   ScrollView
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { obtenerDenunciasPendientes, resolverDenuncia } from '../../services/adminService';
 
-// --- MODAL DE CONFIRMACIÓN ---
-const ConfirmActionModal = ({ visible, tipo, nombre, onConfirm, onCancel, procesando }: any) => {
-  const esStrike = tipo === 'strike';
-  const color = esStrike ? '#FF9800' : '#D50000'; // Naranja o Rojo
+// --- MODAL DE CONFIRMACIÓN MEJORADO ---
+const ConfirmActionModal = ({ visible, tipo, esCritico, nombre, onConfirm, onCancel, procesando }: any) => {
+  // Lógica visual: Si es Ban O es un Strike Crítico (el 3ro), usamos ROJO.
+  const esPeligroso = tipo === 'ban' || esCritico;
+  const color = esPeligroso ? '#D50000' : '#FF9800'; // Rojo o Naranja
+  
+  let titulo = '';
+  let mensaje = '';
+  let icono = '';
+
+  if (tipo === 'ban') {
+    titulo = 'Dar de Baja (Ban)';
+    mensaje = `¿Estás seguro de BLOQUEAR permanentemente a ${nombre}? Esta acción no se puede deshacer.`;
+    icono = 'slash';
+  } else if (esCritico) {
+    // CASO ESPECIAL: ES EL 3ER STRIKE
+    titulo = '⚠️ Baneo Automático';
+    mensaje = `¡ATENCIÓN! ${nombre} ya tiene 2 faltas. \n\nSi aplicas este Strike, llegará a 3 y el sistema BANEARÁ AUTOMÁTICAMENTE la cuenta.\n\n¿Deseas proceder con el baneo?`;
+    icono = 'alert-triangle';
+  } else {
+    // Strike normal (1 o 2)
+    titulo = 'Añadir Falta (Strike)';
+    mensaje = `¿Estás seguro de añadir una falta al historial de ${nombre}?`;
+    icono = 'alert-circle';
+  }
   
   return (
     <Modal transparent visible={visible} animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={[styles.modalIcon, { backgroundColor: color }]}>
-            <Feather name={esStrike ? "alert-triangle" : "slash"} size={30} color="#FFF" />
+            <Feather name={icono as any} size={30} color="#FFF" />
           </View>
-          <Text style={styles.modalTitle}>
-            {esStrike ? 'Añadir Falta (Strike)' : 'Dar de Baja (Ban)'}
-          </Text>
-          <Text style={styles.modalText}>
-            {esStrike 
-              ? `¿Estás seguro de añadir una falta al historial de ${nombre}?`
-              : `¿Estás seguro de BLOQUEAR permanentemente a ${nombre}?`
-            }
-          </Text>
+          <Text style={styles.modalTitle}>{titulo}</Text>
+          <Text style={styles.modalText}>{mensaje}</Text>
           
           {procesando ? (
             <ActivityIndicator size="small" color={color} style={{marginTop: 15}} />
@@ -50,7 +62,9 @@ const ConfirmActionModal = ({ visible, tipo, nombre, onConfirm, onCancel, proces
                 style={[styles.btnConfirm, { backgroundColor: color }]} 
                 onPress={onConfirm}
               >
-                <Text style={styles.btnConfirmText}>Confirmar</Text>
+                <Text style={styles.btnConfirmText}>
+                  {esCritico ? 'Sí, Banear' : 'Confirmar'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -60,16 +74,39 @@ const ConfirmActionModal = ({ visible, tipo, nombre, onConfirm, onCancel, proces
   );
 };
 
+// --- MODAL DE ÉXITO SIMPLE (Para reemplazar Alert) ---
+const SuccessModal = ({ visible, mensaje, onClose }: any) => (
+  <Modal transparent visible={visible} animationType="fade">
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        <View style={[styles.modalIcon, { backgroundColor: '#28a745' }]}>
+          <Feather name="check" size={32} color="#FFF" />
+        </View>
+        <Text style={styles.modalTitle}>¡Listo!</Text>
+        <Text style={styles.modalText}>{mensaje}</Text>
+        <TouchableOpacity style={[styles.btnConfirm, { width: '100%', backgroundColor: '#28a745', flex:0}]} onPress={onClose}>
+          <Text style={styles.btnConfirmText}>Aceptar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </Modal>
+);
+
 export default function AdminReportesScreen() {
   const [reportes, setReportes] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [procesando, setProcesando] = useState(false);
 
-  // Estados del Modal
+  // Estados del Modal Confirmación
   const [modalVisible, setModalVisible] = useState(false);
   const [itemSeleccionado, setItemSeleccionado] = useState<any>(null);
   const [accionModal, setAccionModal] = useState<'strike' | 'ban'>('strike');
+  const [esStrikeCritico, setEsStrikeCritico] = useState(false); // Nuevo estado
+
+  // Estado Modal Éxito
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const cargarDatos = async () => {
     const lista = await obtenerDenunciasPendientes();
@@ -92,6 +129,15 @@ export default function AdminReportesScreen() {
   const abrirModal = (item: any, accion: 'strike' | 'ban') => {
     setItemSeleccionado(item);
     setAccionModal(accion);
+    
+    // VERIFICACIÓN INTELIGENTE:
+    // Si la acción es STRIKE y el usuario ya tiene 2 o más faltas... es CRÍTICO.
+    if (accion === 'strike' && (item.datosAcusado.faltas || 0) >= 2) {
+      setEsStrikeCritico(true);
+    } else {
+      setEsStrikeCritico(false);
+    }
+
     setModalVisible(true);
   };
 
@@ -105,15 +151,25 @@ export default function AdminReportesScreen() {
       accionModal
     );
 
-    if (resultado.success) {
-      setModalVisible(false);
-      await cargarDatos(); // Recargar lista (el item desaparecerá)
-      Alert.alert("Éxito", "Acción aplicada correctamente.");
-    } else {
-      setModalVisible(false);
-      Alert.alert("Error", "No se pudo aplicar la acción.");
-    }
     setProcesando(false);
+    setModalVisible(false);
+
+    if (resultado.success) {
+      // Mostrar modal de éxito en lugar de Alert
+      const msg = resultado.accionAplicada === 'ban' 
+        ? "El usuario ha sido baneado y notificado correctamente."
+        : "Falta aplicada y notificada al usuario.";
+      
+      setSuccessMsg(msg);
+      setSuccessVisible(true);
+      
+      await cargarDatos(); // Recargar lista
+    } else {
+      // Si falla, aquí sí podríamos dejar un Alert simple o reutilizar el SuccessModal con otro color
+      // Por simpleza, reutilizamos SuccessModal cambiándole el texto mentalmente (o crea un ErrorModal)
+      setSuccessMsg("Hubo un error al procesar la solicitud.");
+      setSuccessVisible(true);
+    }
   };
 
   const renderItem = ({ item }: { item: any }) => (
@@ -137,8 +193,8 @@ export default function AdminReportesScreen() {
           </View>
         </View>
 
-        {/* BADGE FALTAS (NARANJA) */}
-        <View style={styles.badgeFaltas}>
+        {/* BADGE FALTAS */}
+        <View style={[styles.badgeFaltas, (item.datosAcusado.faltas >= 2) && { backgroundColor: '#D50000' }]}>
           <Feather name="alert-triangle" size={12} color="#FFF" style={{marginRight: 4}} />
           <Text style={styles.textFaltas}>{item.datosAcusado.faltas} faltas</Text>
         </View>
@@ -154,7 +210,7 @@ export default function AdminReportesScreen() {
 
         {/* BOTONES DE ACCIÓN (Derecha) */}
         <View style={styles.actionsContainer}>
-          {/* Botón Strike (X Negra/Blanca) */}
+          {/* Botón Strike */}
           <TouchableOpacity 
             style={styles.btnStrike} 
             onPress={() => abrirModal(item, 'strike')}
@@ -162,7 +218,7 @@ export default function AdminReportesScreen() {
             <Feather name="x" size={24} color="#000" />
           </TouchableOpacity>
 
-          {/* Botón Ban (Rojo) */}
+          {/* Botón Ban */}
           <TouchableOpacity 
             style={styles.btnBan} 
             onPress={() => abrirModal(item, 'ban')}
@@ -199,13 +255,22 @@ export default function AdminReportesScreen() {
         )}
       </ScrollView>
 
+      {/* Modal de Confirmación de Acción */}
       <ConfirmActionModal
         visible={modalVisible}
         tipo={accionModal}
+        esCritico={esStrikeCritico} // Pasamos la nueva prop
         nombre={itemSeleccionado?.datosAcusado.nombres}
         onConfirm={ejecutarAccion}
         onCancel={() => setModalVisible(false)}
         procesando={procesando}
+      />
+
+      {/* Modal de Éxito (Reemplaza Alert) */}
+      <SuccessModal 
+        visible={successVisible}
+        mensaje={successMsg}
+        onClose={() => setSuccessVisible(false)}
       />
     </View>
   );
@@ -232,7 +297,7 @@ const styles = StyleSheet.create({
   badgeRol: { backgroundColor: '#80BDFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, alignSelf: 'flex-start', marginTop: 4 },
   badgeText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
   
-  // BADGE FALTAS (Top Right)
+  // BADGE FALTAS
   badgeFaltas: { 
     flexDirection: 'row', alignItems: 'center', 
     backgroundColor: '#FF9800', 
@@ -247,7 +312,7 @@ const styles = StyleSheet.create({
   textoMotivo: { fontWeight: 'normal', color: '#333' },
   descripcion: { fontSize: 13, color: '#666', marginTop: 4, fontStyle: 'italic' },
 
-  // ACTIONS (Right)
+  // ACTIONS
   actionsContainer: { flexDirection: 'row', gap: 10 },
   btnStrike: { 
     width: 45, height: 45, borderRadius: 10, 
@@ -260,7 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D50000' 
   },
 
-  // MODAL
+  // MODAL ESTILOS
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: '#FFF', borderRadius: 15, padding: 25, alignItems: 'center' },
   modalIcon: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },

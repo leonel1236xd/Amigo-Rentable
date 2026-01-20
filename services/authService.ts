@@ -11,10 +11,14 @@ import {
   getDoc,
   collection,
   Timestamp,
-  updateDoc
+  updateDoc,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase'; 
+import { sendPasswordResetEmail } from 'firebase/auth';
 
   
   // --- INTERFAZ PARA EL HORARIO ---
@@ -260,5 +264,42 @@ export const guardarTokenNotificacion = async (userId: string, userType: 'client
     });
   } catch (error) {
     console.error("Error guardando token push:", error);
+  }
+};
+
+/**
+ * Verifica si un correo existe en la colección especificada
+ */
+export const verificarCorreoExistente = async (email: string, userType: 'cliente' | 'alqui-amigo') => {
+  try {
+    const collectionName = userType === 'cliente' ? 'clientes' : 'alqui-amigos';
+    const q = query(collection(db, collectionName), where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+    
+    return !querySnapshot.empty; // Retorna true si existe
+  } catch (error) {
+    console.error("Error verificando correo:", error);
+    return false;
+  }
+};
+
+/**
+ * Envía el correo oficial de reseteo de Firebase (Método seguro)
+ */
+export const enviarResetPasswordFirebase = async (email: string) => {
+  try {
+    console.log("Intentando enviar enlace a:", email);
+    await sendPasswordResetEmail(auth, email);
+    console.log("Enlace enviado correctamente por Firebase");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error Firebase Reset:", error.code, error.message);
+    
+    // Errores comunes traducidos
+    if (error.code === 'auth/user-not-found') return { success: false, error: 'Este correo no está registrado en el sistema de autenticación.' };
+    if (error.code === 'auth/invalid-email') return { success: false, error: 'El formato del correo es inválido.' };
+    if (error.code === 'auth/too-many-requests') return { success: false, error: 'Demasiados intentos. Espera unos minutos.' };
+    
+    return { success: false, error: error.message };
   }
 };
