@@ -85,3 +85,30 @@ export async function enviarNotificacionPush(expoPushToken: string, titulo: stri
     console.error("Error enviando push:", error);
   }
 }
+
+export async function agendarRecordatorioLocal(
+  titulo: string, 
+  cuerpo: string, 
+  segundosHastaElEvento: number
+) {
+  try {
+    // Calculamos el momento del disparo (trigger)
+    // Nota: seconds debe ser positivo. Si es negativo, la notificación falla o sale inmediato.
+    if (segundosHastaElEvento <= 0) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: titulo,
+        body: cuerpo,
+        sound: 'default',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: segundosHastaElEvento, // Expo cuenta en segundos desde "ahora"
+      },
+    });
+    console.log(`⏰ Recordatorio agendado en ${segundosHastaElEvento} segundos`);
+  } catch (error) {
+    console.error("Error agendando recordatorio local:", error);
+  }
+}

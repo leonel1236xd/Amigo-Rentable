@@ -15,7 +15,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
-import { enviarNotificacionPush } from '../../services/notificationService';
+import { enviarNotificacionPush, agendarRecordatorioLocal } from '../../services/notificationService';
 
 
 interface SolicitudEntrante {
@@ -51,6 +51,7 @@ export default function SolicitudesAlquiAmigoScreen() {
     setRefreshing(false);
   };
 
+
   const ordenarSolicitudes = (lista: SolicitudEntrante[]) => {
     return lista.sort((a, b) => {
       const pesoEstado = { 'pendiente': 1, 'aceptada': 2, 'rechazada': 3, 'concluida': 4 };
@@ -80,7 +81,7 @@ export default function SolicitudesAlquiAmigoScreen() {
         querySnapshot.docs.map(async (document) => {
           const data = document.data();
           
-          // Datos por defecto si falla la carga del cliente
+          
           let clienteInfo: {
             nombres: string;
             fotoURL: string;
@@ -110,7 +111,7 @@ export default function SolicitudesAlquiAmigoScreen() {
                 email: cData.email || 'No disponible',
                 genero: cData.genero || 'No especificado',
                 fechaNacimiento: cData.fechaNacimiento || '',
-                pushToken: null as string | null // <--- ¡AQUÍ ES DONDE DEBE IR!
+                pushToken: null as string | null 
               };
             }
           } catch (e) {
@@ -132,8 +133,7 @@ export default function SolicitudesAlquiAmigoScreen() {
             duracion: data.duracion,
             estado: estadoFinal,
             
-            // --- CORRECCIÓN CRÍTICA DE DATOS ---
-            // Mapeamos explícitamente para que detalle_solicitud reciba los nombres correctos
+
             datosCompletos: { 
               id: document.id,
               // Datos del Cliente
@@ -164,31 +164,76 @@ export default function SolicitudesAlquiAmigoScreen() {
     }
   };
 
+  // Función para programar recordatorio local
+  const programarRecordatorio = (fechaStr: string, horaStr: string, nombreCliente: string) => {
+    try {    
+      
+      const [year, month, day] = fechaStr.split('-').map(Number);
+      let [timePart, modifier] = horaStr.split(' ');
+      let [hours, minutes] = timePart.split(':').map(Number);
+
+      if (modifier) {
+        modifier = modifier.toUpperCase();
+        if (modifier === 'PM' && hours < 12) hours += 12;
+        if (modifier === 'AM' && hours === 12) hours = 0;
+      }
+
+      const fechaEvento = new Date(year, month - 1, day, hours, minutes, 0);
+      const ahora = new Date();
+
+      // Restar 30 minutos (30 * 60 * 1000 ms)
+      const fechaRecordatorio = new Date(fechaEvento.getTime() - 30 * 60000);
+
+      // Calcular diferencia en segundos desde AHORA hasta el RECORDATORIO
+      const segundosHastaRecordatorio = (fechaRecordatorio.getTime() - ahora.getTime()) / 1000;
+
+      if (segundosHastaRecordatorio > 0) {
+        agendarRecordatorioLocal(
+          "⏰ Recordatorio de Salida",
+          `Tu encuentro con ${nombreCliente} comienza en 30 minutos. ¡Prepárate!`,
+          segundosHastaRecordatorio
+        );
+        console.log("Recordatorio programado para:", fechaRecordatorio);
+      } else {
+        console.log("Faltan menos de 30 mins o ya pasó, no se agenda recordatorio.");
+      }
+
+    } catch (e) {
+      console.error("Error calculando fecha recordatorio:", e);
+    }
+  };
+
   const cambiarEstado = async (id: string, nuevoEstado: 'aceptada' | 'rechazada') => {
-    // 1. Actualizar visualmente primero (Optimistic UI) para que se sienta rápido
+    
     setSolicitudes(prev => {
       const act = prev.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s);
       return ordenarSolicitudes(act);
     });
 
     try {
-      // 2. Actualizar el estado en Firebase (Solicitud)
       await updateDoc(doc(db, 'solicitudes', id), { estado_solicitud: nuevoEstado });
 
-      // --- CAMBIO CLAVE: BUSCAR TOKEN FRESCO ---
-      // Buscamos la solicitud en memoria solo para obtener el ID del cliente
+      //Buscamos la solicitud en memoria
       const solicitudEnMemoria = solicitudes.find(s => s.id === id);
       
       if (solicitudEnMemoria) {
-        // Vamos directamente a la colección 'clientes' a buscar su token REAL
+        
+        //LÓGICA DE RECORDATORIO
+        if (nuevoEstado === 'aceptada') {
+          programarRecordatorio(
+            solicitudEnMemoria.fecha, 
+            solicitudEnMemoria.hora, 
+            solicitudEnMemoria.nombreCliente
+          );
+        }
+
+    
         const clienteRef = doc(db, 'clientes', solicitudEnMemoria.cliente_id);
         const clienteSnap = await getDoc(clienteRef);
 
         if (clienteSnap.exists()) {
           const datosCliente = clienteSnap.data();
-          const tokenDestino = datosCliente?.pushToken; // Leemos el campo exacto de tu BD
-
-          console.log("Token fresco obtenido de BD:", tokenDestino);
+          const tokenDestino = datosCliente?.pushToken;
 
           if (tokenDestino) {
             let titulo = '';
@@ -202,31 +247,24 @@ export default function SolicitudesAlquiAmigoScreen() {
               cuerpo = `El AlquiAmigo no puede aceptar tu solicitud en este momento.`;
             }
 
-            // Enviamos la notificación
             await enviarNotificacionPush(
               tokenDestino,
               titulo,
               cuerpo,
               { solicitudId: id, tipo: 'cambio_estado' }
             );
-            console.log("✅ Notificación enviada exitosamente");
-          } else {
-            console.warn("⚠️ El documento del cliente existe, pero el campo 'pushToken' está vacío.");
           }
-        } else {
-          console.error("❌ No se encontró el documento del cliente en Firebase.");
         }
       }
 
     } catch (error) {
       Alert.alert("Error", "No se pudo actualizar la solicitud.");
       console.error("Error en cambiarEstado:", error);
-      cargarSolicitudesEntrantes(); // Revertir cambios visuales si falla
+      cargarSolicitudesEntrantes(); 
     }
   };
 
   const irADetalles = (solicitud: any) => {
-
     router.push({
       pathname: '/(alqui-amigo)/detalle_solicitud',
       params: { id: solicitud.id } 
@@ -329,6 +367,7 @@ export default function SolicitudesAlquiAmigoScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
