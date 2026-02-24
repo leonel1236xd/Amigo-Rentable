@@ -1,3 +1,4 @@
+// hobbies.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -30,16 +31,13 @@ export default function HobbiesScreen() {
   // Función para añadir/quitar hobbies
   const toggleHobby = (hobby: string) => {
     if (seleccionados.includes(hobby)) {
-      // Si ya está, lo quitamos
       setSeleccionados(seleccionados.filter(h => h !== hobby));
     } else {
-      // Si no está, lo agregamos
       setSeleccionados([...seleccionados, hobby]);
     }
   };
 
   const aplicarFiltros = () => {
-    // Si no seleccionó nada, mandamos undefined para limpiar el filtro
     const filtrosHobbies = seleccionados.length > 0 ? JSON.stringify(seleccionados) : undefined;
 
     router.push({
@@ -57,7 +55,7 @@ export default function HobbiesScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.botonAtras}>
           <Feather name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Seleccionar Hobbies</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>Seleccionar Hobbies</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -65,17 +63,17 @@ export default function HobbiesScreen() {
         
         {/* SECCIÓN 1: Hobbies Seleccionados (Dinámica) */}
         <View style={styles.sectionHeaderContainer}>
-          <Text style={styles.sectionTitle}>Hobbies Seleccionados:</Text>
+          <Text style={styles.sectionTitle} allowFontScaling={false}>Hobbies Seleccionados:</Text>
           {seleccionados.length > 0 && (
             <TouchableOpacity onPress={() => setSeleccionados([])}>
-              <Text style={styles.limpiarTexto}>Limpiar</Text>
+              <Text style={styles.limpiarTexto} allowFontScaling={false}>Limpiar</Text>
             </TouchableOpacity>
           )}
         </View>
 
         <View style={[styles.chipsContainer, styles.areaSeleccionada]}>
           {seleccionados.length === 0 ? (
-            <Text style={styles.placeholderTexto}>
+            <Text style={styles.placeholderTexto} allowFontScaling={false}>
               Selecciona opciones abajo para agregar aquí
             </Text>
           ) : (
@@ -85,7 +83,7 @@ export default function HobbiesScreen() {
                 style={[styles.chip, styles.chipSelected]}
                 onPress={() => toggleHobby(hobby)}
               >
-                <Text style={[styles.chipText, styles.chipTextSelected]}>
+                <Text style={[styles.chipText, styles.chipTextSelected]} allowFontScaling={false}>
                   {hobby} <Feather name="x" size={14} color="#FFF" />
                 </Text>
               </TouchableOpacity>
@@ -94,10 +92,9 @@ export default function HobbiesScreen() {
         </View>
 
         {/* SECCIÓN 2: Explorar Hobbies */}
-        <Text style={styles.sectionTitle}>Explorar Hobbies:</Text>
+        <Text style={styles.sectionTitle} allowFontScaling={false}>Explorar Hobbies:</Text>
         <View style={styles.chipsContainer}>
           {todosLosHobbies.map((hobby) => {
-            // Si ya está seleccionado, lo mostramos diferente o deshabilitado visualmente
             const isSelected = seleccionados.includes(hobby);
             return (
               <TouchableOpacity
@@ -111,7 +108,7 @@ export default function HobbiesScreen() {
                 <Text style={[
                   styles.chipText, 
                   isSelected ? styles.chipTextInactivo : styles.chipTextNormal
-                ]}>
+                ]} allowFontScaling={false}>
                   {hobby}
                 </Text>
               </TouchableOpacity>
@@ -124,7 +121,7 @@ export default function HobbiesScreen() {
       {/* Footer Botón */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.botonAplicar} onPress={aplicarFiltros}>
-          <Text style={styles.botonAplicarTexto}>Aplicar filtros</Text>
+          <Text style={styles.botonAplicarTexto} allowFontScaling={false}>Aplicar filtros</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -155,13 +152,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 140, 
   },
   sectionHeaderContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: -5,
     marginBottom: 10,
   },
   sectionTitle: {
@@ -172,7 +169,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   limpiarTexto: {
-    color: '#DC3545', // Rojo para limpiar
+    color: '#DC3545',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -183,7 +180,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderWidth: 1,
     borderColor: '#EEEEEE',
-    borderStyle: 'dashed', // Borde punteado para indicar zona de drop/selección
+    borderStyle: 'dashed',
   },
   placeholderTexto: {
     color: '#999',
@@ -204,7 +201,6 @@ const styles = StyleSheet.create({
     marginRight: 10,
     marginBottom: 10,
   },
-  // Estilos Chip Normal (Explorar)
   chipNormal: {
     backgroundColor: '#E0E0E0',
     borderColor: '#CCCCCC',
@@ -213,7 +209,6 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
-  // Estilos Chip Seleccionado (Arriba)
   chipSelected: {
     backgroundColor: '#008FD9',
     borderColor: '#008FD9',
@@ -222,7 +217,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  // Estilos Chip Inactivo (Cuando ya está seleccionado abajo)
   chipInactivo: {
     backgroundColor: '#F0F0F0',
     borderColor: '#E0E0E0',

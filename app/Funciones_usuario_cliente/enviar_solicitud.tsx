@@ -144,6 +144,26 @@ export default function EnviarSolicitudScreen() {
       return;
     }
 
+    // Validación: si la fecha es hoy, la hora no puede ser anterior o igual a la actual
+    const ahora = new Date();
+    const esHoy =
+      fecha.getFullYear() === ahora.getFullYear() &&
+      fecha.getMonth() === ahora.getMonth() &&
+      fecha.getDate() === ahora.getDate();
+
+    if (esHoy) {
+      const momentoSeleccionado = new Date();
+      momentoSeleccionado.setHours(hora.getHours(), hora.getMinutes(), 0, 0);
+      if (momentoSeleccionado <= ahora) {
+        mostrarModal(
+          "Hora inválida",
+          "La hora seleccionada ya pasó. Por favor elige una hora futura para hoy.",
+          'error'
+        );
+        return;
+      }
+    }
+
     if (!clienteData) {
       mostrarModal("Error de Usuario", "No pudimos identificar tu sesión. Intenta reconectar.", 'error');
       return;

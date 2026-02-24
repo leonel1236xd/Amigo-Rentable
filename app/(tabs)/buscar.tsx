@@ -15,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router'; 
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
 import { getUserData } from '../../services/authService';
 import { Feather } from '@expo/vector-icons';
@@ -86,7 +86,12 @@ export default function BuscarAlquiAmigos() {
   const cargarAlquiAmigos = async () => {
     try {
       setCargando(true);
-      const q = query(collection(db, 'alqui-amigos'), orderBy('rating', 'desc'));
+      const q = query(
+        collection(db, 'alqui-amigos'),
+        where('activo', '==', true),
+        where('estadoCuenta', '==', 'aceptada'),
+        orderBy('rating', 'desc')
+      );
       const querySnapshot = await getDocs(q);
       
       const amigos: AlquiAmigo[] = [];

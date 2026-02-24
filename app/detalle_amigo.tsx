@@ -184,7 +184,7 @@ export default function DetalleAlquiAmigoScreen() {
         <View style={styles.contactoCard}>
           <View style={styles.filaContacto}>
             <Text style={styles.labelContacto}>Teléfono:</Text>
-            <Text style={styles.valorContacto}>{amigo.telefono || "No disponible"}</Text>
+            <Text style={styles.valorContacto}>+591  {amigo.telefono || "No disponible"}</Text>
           </View>
           
           <View style={styles.filaContacto}>
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 100, // Espacio para el footer
+    paddingBottom: 150, // Espacio para el footer
     alignItems: 'center', // Centrar elementos como el avatar
   },
   // AVATAR
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
     padding: 15,
-    marginTop: 10,
+    marginTop: 4,
   },
   filaContacto: {
     flexDirection: 'row',

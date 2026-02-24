@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   botonMotivoSelected: { backgroundColor: '#008FD9' },
   textoMotivo: { fontSize: 13, color: '#000', textAlign: 'center', marginTop: 5, fontWeight: '500' },
   textoMotivoSelected: { color: '#FFFFFF', fontWeight: 'bold' },
-  textAreaContainer: { backgroundColor: '#F0F0F0', borderRadius: 10, padding: 10, height: 120, marginBottom: 25 },
+  textAreaContainer: { backgroundColor: '#F0F0F0', borderRadius: 10, padding: 10, height: 100, marginBottom: 25 },
   textArea: { flex: 1, fontSize: 15, color: '#333' },
   botonEnviar: { backgroundColor: '#D50000', borderRadius: 10, paddingVertical: 15, alignItems: 'center' },
   botonDeshabilitado: { backgroundColor: '#E57373' },

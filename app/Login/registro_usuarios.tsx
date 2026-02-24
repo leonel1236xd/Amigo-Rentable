@@ -378,7 +378,6 @@ export default function RegisterScreen() {
               <Picker.Item label="Género" value="" color="#888" />
               <Picker.Item label="Masculino" value="masculino" color="#000" />
               <Picker.Item label="Femenino" value="femenino" color="#000" />
-              <Picker.Item label="Otro" value="otro" color="#000" />
             </Picker>
           </View>
 

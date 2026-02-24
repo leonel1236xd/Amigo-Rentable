@@ -66,14 +66,14 @@ export default function FiltrosScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.botonAtras}>
           <Feather name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Más filtros</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>Más filtros</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
         {/* SECCIÓN HOBBIES */}
-        <Text style={styles.seccionTitulo}>Hobbies:</Text>
+        <Text style={styles.seccionTitulo} allowFontScaling={false}>Hobbies:</Text>
         <View style={styles.chipsContainer}>
           {listaHobbies.map((hobby) => {
             const isSelected = hobbies.includes(hobby);
@@ -83,7 +83,7 @@ export default function FiltrosScreen() {
                 style={[styles.chip, isSelected && styles.chipSelected]}
                 onPress={() => toggleHobby(hobby)}
               >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]} allowFontScaling={false}>
                   {hobby}
                 </Text>
               </TouchableOpacity>
@@ -92,7 +92,7 @@ export default function FiltrosScreen() {
         </View>
 
         {/* SECCIÓN HORARIOS */}
-        <Text style={styles.seccionTitulo}>Horarios:</Text>
+        <Text style={styles.seccionTitulo} allowFontScaling={false}>Horarios:</Text>
         <View style={styles.chipsContainer}>
           {listaHorarios.map((horario) => {
             const isSelected = horarios.includes(horario);
@@ -102,7 +102,7 @@ export default function FiltrosScreen() {
                 style={[styles.chip, isSelected && styles.chipSelected]}
                 onPress={() => toggleHorario(horario)}
               >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]} allowFontScaling={false}>
                   {horario}
                 </Text>
               </TouchableOpacity>
@@ -111,9 +111,9 @@ export default function FiltrosScreen() {
         </View>
 
         {/* SECCIÓN EDAD */}
-        <Text style={styles.seccionTitulo}>Edad:</Text>
+        <Text style={styles.seccionTitulo} allowFontScaling={false}>Edad:</Text>
         <View style={styles.sliderContainer}>
-          <Text style={styles.rangoTexto}>{rangoEdad[0]} - {rangoEdad[1]} años</Text>
+          <Text style={styles.rangoTexto} allowFontScaling={false}>{rangoEdad[0]} - {rangoEdad[1]} años</Text>
           <Slider
             value={rangoEdad}
             minimumValue={18}
@@ -129,7 +129,7 @@ export default function FiltrosScreen() {
         </View>
 
         {/* SECCIÓN GÉNERO */}
-        <Text style={styles.seccionTitulo}>Género:</Text>
+        <Text style={styles.seccionTitulo} allowFontScaling={false}>Género:</Text>
         <View style={styles.radioContainer}>
           {['Cualquiera', 'Hombre', 'Mujer'].map((opcion) => {
             const isSelected = genero === opcion.toLowerCase() || (opcion === 'Cualquiera' && genero === 'Cualquiera');
@@ -144,7 +144,7 @@ export default function FiltrosScreen() {
                 <View style={[styles.radioCirculo, isSelected && styles.radioCirculoSelected]}>
                   {isSelected ? <View style={styles.radioPunto} /> : null}
                 </View>
-                <Text style={styles.radioTexto}>{opcion}</Text>
+                <Text style={styles.radioTexto} allowFontScaling={false}>{opcion}</Text>
               </TouchableOpacity>
             );
           })}
@@ -155,7 +155,7 @@ export default function FiltrosScreen() {
       {/* FOOTER BOTÓN */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.botonAplicar} onPress={aplicarFiltros}>
-          <Text style={styles.botonAplicarTexto}>Aplicar filtros</Text>
+          <Text style={styles.botonAplicarTexto} allowFontScaling={false}>Aplicar filtros</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 50,
-    paddingBottom: 15,
+    paddingBottom: 5,
     paddingHorizontal: 20,
     backgroundColor: '#F5F5F5',
   },
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 155, 
   },
   seccionTitulo: {
     fontSize: 18,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   chipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 20,
+    marginBottom: 7,
   },
   chip: {
     paddingVertical: 8,

@@ -336,14 +336,14 @@ const styles = StyleSheet.create({
   // User Type
   userTypeContainer: { flexDirection: 'row', gap: 10, marginBottom: 5 },
   userTypeButton: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#E5E5E5', alignItems: 'center' },
-  activeUserType: { backgroundColor: '#008FD9' },
+  activeUserType: { backgroundColor: '#007BFF' },
   userTypeText: { fontSize: 14, color: '#666', fontWeight: '600' },
   activeUserTypeText: { color: '#FFF' },
 
   // Email Row
   emailRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 5 },
   inputEmail: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 10, padding: 15, fontSize: 16, color: '#333' },
-  sendButton: { backgroundColor: '#008FD9', padding: 15, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  sendButton: { backgroundColor: '#007BFF', padding: 15, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   
   // Code Inputs
   codeContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 5 },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   inputDisabled: { opacity: 0.5, backgroundColor: '#EEE' },
 
   // Save Button
-  saveButton: { backgroundColor: '#008FD9', borderRadius: 10, paddingVertical: 15, alignItems: 'center', marginTop: 30 },
+  saveButton: { backgroundColor: '#007BFF', borderRadius: 10, paddingVertical: 15, alignItems: 'center', marginTop: 30 },
   saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   disabledBtn: { backgroundColor: '#B0C4DE' },
 

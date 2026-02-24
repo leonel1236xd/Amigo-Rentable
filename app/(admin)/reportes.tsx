@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   avatar: { width: '100%', height: '100%' },
   infoContainer: { flex: 1, marginLeft: 10, justifyContent: 'center' },
   nombre: { fontWeight: 'bold', fontSize: 17, color: '#000' },
-  badgeRol: { backgroundColor: '#80BDFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, alignSelf: 'flex-start', marginTop: 4 },
+  badgeRol: { backgroundColor: '#007BFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, alignSelf: 'flex-start', marginTop: 4 },
   badgeText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
   
   // BADGE FALTAS

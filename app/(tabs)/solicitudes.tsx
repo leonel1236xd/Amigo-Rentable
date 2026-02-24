@@ -22,10 +22,8 @@ interface SolicitudVisual {
   alqui_amigo_id: string;
   nombreAmigo: string;
   fotoAmigo: string;
-  // NUEVOS CAMPOS NECESARIOS
   telefonoAmigo: string; 
   ratingAmigo: number;
-  // -----------------------
   lugar: string;
   fecha: string;
   hora: string;
@@ -91,8 +89,8 @@ export default function SolicitudesScreen() {
           
           let nombreAmigo = 'Usuario Desconocido';
           let fotoAmigo = '';
-          let telefonoAmigo = ''; // Variable para guardar el teléfono
-          let ratingAmigo = 0;    // Variable para guardar el rating
+          let telefonoAmigo = '';
+          let ratingAmigo = 0;    
 
           try {
             const amigoDoc = await getDoc(doc(db, 'alqui-amigos', data.alqui_amigo_id));
@@ -100,7 +98,6 @@ export default function SolicitudesScreen() {
               const amigoData = amigoDoc.data();
               nombreAmigo = amigoData.nombres;
               fotoAmigo = amigoData.fotoURL;
-              // CAMBIO IMPORTANTE: Capturamos los datos que faltaban
               telefonoAmigo = amigoData.telefono || ''; 
               ratingAmigo = amigoData.rating || 0;
             }
@@ -122,8 +119,8 @@ export default function SolicitudesScreen() {
             alqui_amigo_id: data.alqui_amigo_id,
             nombreAmigo,
             fotoAmigo,
-            telefonoAmigo, // Guardamos
-            ratingAmigo,   // Guardamos
+            telefonoAmigo, 
+            ratingAmigo,   
             lugar: data.lugar_asistir,
             fecha: data.fecha_salida, 
             hora: data.hora_salida,   
@@ -221,7 +218,7 @@ export default function SolicitudesScreen() {
               <Feather name="user" size={24} color="#555" />
             )}
           </View>
-          <Text style={styles.userName}>{item.nombreAmigo}</Text>
+          <Text style={styles.userName} numberOfLines={1}>{item.nombreAmigo}</Text>
         </View>
         {renderBadgeEstado(item.estado)}
       </View>
@@ -403,6 +400,8 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   avatarBorder: {
     width: 50,
@@ -424,11 +423,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: 'bold',
     color: '#000',
+    flex: 1,
+    flexShrink: 1,
   },
   badge: {
     paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 20,
+    flexShrink: 0,
   },
   badgeText: {
     fontSize: 13,
