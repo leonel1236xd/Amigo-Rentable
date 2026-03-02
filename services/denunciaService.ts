@@ -10,7 +10,7 @@ import {
     cliente_id: string;
     alqui_amigo_id: string; // Agregamos esto para saber a quién se denuncia
     solicitud_id?: string;  // Opcional: para vincularlo a una cita específica
-    motivo: string;
+    motivo: string[];
     descripcion: string;
     fecha_creacion: Timestamp;
     estado: 'pendiente' | 'revisada' | 'resuelta'; // Para gestión interna

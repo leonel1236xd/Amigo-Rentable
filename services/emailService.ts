@@ -8,22 +8,36 @@ const EMAILJS_PUBLIC_KEY = "98HcRhnLWyankTksd";
 export const enviarCorreoAutomatico = async (
   destinatarioEmail: string, 
   nombreUsuario: string, 
-  aceptado: boolean
+  aceptado: boolean,
+  motivosRechazo?: string[] // <--- NUEVO PARÁMETRO OPCIONAL
 ) => {
   
-  const mensaje = aceptado 
-    ? `¡Felicidades ${nombreUsuario}! Tu cuenta en Amigo Rentable ha sido ACEPTADA. Ya puedes iniciar sesión y disfrutar de la plataforma.`
-    : `Hola ${nombreUsuario}. Lamentamos informarte que tu solicitud de registro en Amigo Rentable ha sido RECHAZADA.`;
+  let mensaje = "";
+
+  if (aceptado) {
+    mensaje = `¡Felicidades ${nombreUsuario}! Tu cuenta en Amigo Rentable ha sido ACEPTADA. Ya puedes iniciar sesión y disfrutar de la plataforma.`;
+  } else {
+    mensaje = `Hola ${nombreUsuario}. Lamentamos informarte que tu solicitud de registro en Amigo Rentable ha sido RECHAZADA.`;
+    
+    // SI HAY MOTIVOS DE RECHAZO, LOS AGREGAMOS AL MENSAJE
+    if (motivosRechazo && motivosRechazo.length > 0) {
+      mensaje += `\n\nMotivos principales del rechazo:\n`;
+      motivosRechazo.forEach(motivo => {
+        mensaje += `- ${motivo}\n`;
+      });
+      mensaje += `\nPor favor, corrige estos detalles e intenta registrarte nuevamente.`;
+    }
+  }
 
   const data = {
-    service_id: EMAILJS_SERVICE_ID,
-    template_id: EMAILJS_TEMPLATE_ID,
-    user_id: EMAILJS_PUBLIC_KEY,
+    service_id: "service_2ptdu7d", // Reemplaza con tus variables si las tienes en constantes
+    template_id: "template_voibff8",
+    user_id: "98HcRhnLWyankTksd",
     template_params: {
       to_email: destinatarioEmail,
       to_name: nombreUsuario,
       message: mensaje,
-      subject: aceptado ? "¡Bienvenido a Amigo Rentable!" : "Estado de tu solicitud",
+      subject: aceptado ? "¡Bienvenido a Amigo Rentable!" : "Estado de tu solicitud de registro",
     }
   };
 
@@ -32,7 +46,7 @@ export const enviarCorreoAutomatico = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Origin': 'http://localhost' // Truco para evitar algunos bloqueos de CORS
+        'Origin': 'http://localhost' 
       },
       body: JSON.stringify(data),
     });

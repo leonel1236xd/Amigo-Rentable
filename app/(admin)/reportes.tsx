@@ -204,7 +204,11 @@ export default function AdminReportesScreen() {
       <View style={styles.bodyRow}>
         {/* MOTIVO (Izquierda) */}
         <View style={styles.motivoContainer}>
-          <Text style={styles.labelMotivo}>Motivo: <Text style={styles.textoMotivo}>{item.motivo}</Text></Text>
+          <Text style={styles.labelMotivo}>Motivo: <Text></Text>
+          <Text style={styles.textoMotivo}>
+            {Array.isArray(item.motivo) ? item.motivo.join(' / ').replace(/\n/g, ' ') : item.motivo}
+          </Text>
+          </Text>
           <Text style={styles.descripcion} numberOfLines={2}>{item.descripcion}</Text>
         </View>
 
@@ -309,7 +313,7 @@ const styles = StyleSheet.create({
   bodyRow: { flexDirection: 'row', marginTop: 15, alignItems: 'center' },
   motivoContainer: { flex: 1, paddingRight: 10 },
   labelMotivo: { fontWeight: 'bold', fontSize: 14, color: '#000' },
-  textoMotivo: { fontWeight: 'normal', color: '#333' },
+  textoMotivo: { fontWeight: 'normal', color: '#333'},
   descripcion: { fontSize: 13, color: '#666', marginTop: 4, fontStyle: 'italic' },
 
   // ACTIONS

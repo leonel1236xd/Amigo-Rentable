@@ -44,13 +44,13 @@ const ModalMensaje: React.FC<ModalMensajeProps> = ({ visible, titulo, mensaje, t
               color="#FFFFFF" 
             />
           </View>
-          <Text style={styles.modalTitulo}>{titulo}</Text>
-          <Text style={styles.modalMensaje}>{mensaje}</Text>
+          <Text style={styles.modalTitulo} allowFontScaling={false}>{titulo}</Text>
+          <Text style={styles.modalMensaje} allowFontScaling={false}>{mensaje}</Text>
           <TouchableOpacity 
             style={[styles.modalBoton, { backgroundColor: colorFondo }]} 
             onPress={onClose}
           >
-            <Text style={styles.modalBotonTexto}>Aceptar</Text>
+            <Text style={styles.modalBotonTexto} allowFontScaling={false}>Aceptar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -62,12 +62,14 @@ export default function DenunciaScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // Ahora recibirá estos valores correctamente desde calificar_experiencia.tsx
   const { alquiAmigoId, solicitudId } = params;
 
   const [datosAmigo, setDatosAmigo] = useState<any>(null); 
   const [loadingDatos, setLoadingDatos] = useState(true);
-  const [motivoSeleccionado, setMotivoSeleccionado] = useState('');
+  
+  // CAMBIO 1: El estado ahora es un arreglo vacío
+  const [motivosSeleccionados, setMotivosSeleccionados] = useState<string[]>([]);
+  
   const [descripcion, setDescripcion] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -110,9 +112,21 @@ export default function DenunciaScreen() {
     if (modalDatos.accion) modalDatos.accion();
   };
 
+  // CAMBIO 2: Función para seleccionar/deseleccionar motivos
+  const toggleMotivo = (motivoLabel: string) => {
+    if (motivosSeleccionados.includes(motivoLabel)) {
+      // Si ya está, lo quitamos
+      setMotivosSeleccionados(motivosSeleccionados.filter(m => m !== motivoLabel));
+    } else {
+      // Si no está, lo agregamos
+      setMotivosSeleccionados([...motivosSeleccionados, motivoLabel]);
+    }
+  };
+
   const enviarReporte = async () => {
-    if (!motivoSeleccionado) {
-      mostrarModal('Falta el motivo', 'Por favor selecciona un motivo para la denuncia.', 'error');
+    // CAMBIO 3: Validar que el arreglo no esté vacío
+    if (motivosSeleccionados.length === 0) {
+      mostrarModal('Falta el motivo', 'Por favor selecciona al menos un motivo para la denuncia.', 'error');
       return;
     }
     if (!descripcion.trim()) {
@@ -126,7 +140,7 @@ export default function DenunciaScreen() {
       cliente_id: auth.currentUser?.uid || '',
       alqui_amigo_id: alquiAmigoId as string,
       solicitud_id: (solicitudId as string) || '', 
-      motivo: motivoSeleccionado,
+      motivo: motivosSeleccionados, // PASAMOS EL ARREGLO COMPLETO
       descripcion: descripcion,
       fecha_creacion: null as any, 
       estado: 'pendiente'
@@ -161,7 +175,7 @@ export default function DenunciaScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#008FD9" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Cargando datos...</Text>
+        <Text style={{ marginTop: 10, color: '#666' }} allowFontScaling={false}>Cargando datos...</Text>
       </View>
     );
   }
@@ -177,13 +191,13 @@ export default function DenunciaScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.botonAtras}>
           <Feather name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Denuncia / Queja</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>Denuncia / Queja</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        <Text style={styles.seccionTitulo}>Información del Alqui-Amigo</Text>
+        <Text style={styles.seccionTitulo} allowFontScaling={false}>Información del Alqui-Amigo</Text>
         
         {/* Tarjeta de Información */}
         <View style={styles.cardInfo}>
@@ -195,24 +209,29 @@ export default function DenunciaScreen() {
             )}
           </View>
           <View style={styles.textosInfo}>
-            <Text style={styles.nombreInfo}>{datosAmigo.nombres}</Text>
+            <Text style={styles.nombreInfo} allowFontScaling={false}>{datosAmigo.nombres}</Text>
             <View style={styles.filaIcono}>
               <Feather name="phone" size={14} color="#666" />
-              <Text style={styles.detalleInfo}> {datosAmigo.telefono || '+591 No disponible'}</Text>
+              <Text style={styles.detalleInfo} allowFontScaling={false}> {datosAmigo.telefono || '+591 No disponible'}</Text>
             </View>
             <View style={styles.filaIcono}>
               <Feather name="star" size={14} color="#FFD700" />
-              <Text style={styles.detalleInfo}> {datosAmigo.rating ? Number(datosAmigo.rating).toFixed(1) : 'N/A'}</Text>
+              <Text style={styles.detalleInfo} allowFontScaling={false}> {datosAmigo.rating ? Number(datosAmigo.rating).toFixed(1) : 'N/A'}</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.seccionTitulo}>Motivo de la denuncia</Text>
+        {/* CAMBIO VISUAL: Texto indicando que puede seleccionar varios */}
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+           <Text style={styles.seccionTitulo} allowFontScaling={false}>Motivo de la denuncia</Text>
+           <Text style={{color: '#999', fontSize: 12, marginTop: 5}} allowFontScaling={false}>(Selecciona uno o más)</Text>
+        </View>
 
         {/* Grid de Motivos */}
         <View style={styles.gridMotivos}>
           {motivos.map((m) => {
-            const isSelected = motivoSeleccionado === m.label; 
+            // CAMBIO 4: Verificamos si la lista incluye este motivo
+            const isSelected = motivosSeleccionados.includes(m.label); 
             return (
               <TouchableOpacity
                 key={m.id}
@@ -220,7 +239,7 @@ export default function DenunciaScreen() {
                   styles.botonMotivo, 
                   isSelected && styles.botonMotivoSelected
                 ]}
-                onPress={() => setMotivoSeleccionado(m.label)}
+                onPress={() => toggleMotivo(m.label)} // Llama a la función toggle
               >
                 <Feather 
                   name={m.icon as any} 
@@ -231,7 +250,7 @@ export default function DenunciaScreen() {
                 <Text style={[
                   styles.textoMotivo,
                   isSelected && styles.textoMotivoSelected
-                ]}>
+                ]} allowFontScaling={false}>
                   {m.label}
                 </Text>
               </TouchableOpacity>
@@ -239,7 +258,7 @@ export default function DenunciaScreen() {
           })}
         </View>
 
-        <Text style={styles.seccionTitulo}>Descripción</Text>
+        <Text style={styles.seccionTitulo} allowFontScaling={false}>Descripción</Text>
         <View style={styles.textAreaContainer}>
           <TextInput
             style={styles.textArea}
@@ -261,7 +280,7 @@ export default function DenunciaScreen() {
           {cargando ? (
             <ActivityIndicator color="#FFF" />
           ) : (
-            <Text style={styles.textoBotonEnviar}>Enviar Denuncia</Text>
+            <Text style={styles.textoBotonEnviar} allowFontScaling={false}>Enviar Denuncia</Text>
           )}
         </TouchableOpacity>
 
@@ -280,7 +299,6 @@ export default function DenunciaScreen() {
 }
 
 const styles = StyleSheet.create({
-  // TUS ESTILOS IGUALES AL ORIGINAL
   container: { flex: 1, backgroundColor: '#F9F9F9' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 50, paddingBottom: 15, paddingHorizontal: 20, backgroundColor: '#FFFFFF' },
@@ -295,12 +313,12 @@ const styles = StyleSheet.create({
   nombreInfo: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 5 },
   filaIcono: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
   detalleInfo: { fontSize: 14, color: '#666' },
-  gridMotivos: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 15 },
-  botonMotivo: { width: '48%', backgroundColor: '#E0F0FF', borderRadius: 10, paddingVertical: 15, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#008FD9' },
+  gridMotivos: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 8 },
+  botonMotivo: { width: '48%', backgroundColor: '#E0F0FF', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 7, borderWidth: 1, borderColor: '#008FD9' },
   botonMotivoSelected: { backgroundColor: '#008FD9' },
   textoMotivo: { fontSize: 13, color: '#000', textAlign: 'center', marginTop: 5, fontWeight: '500' },
   textoMotivoSelected: { color: '#FFFFFF', fontWeight: 'bold' },
-  textAreaContainer: { backgroundColor: '#F0F0F0', borderRadius: 10, padding: 10, height: 100, marginBottom: 25 },
+  textAreaContainer: { backgroundColor: '#F0F0F0', borderRadius: 10, padding: 10, height: 100, marginBottom: 20 },
   textArea: { flex: 1, fontSize: 15, color: '#333' },
   botonEnviar: { backgroundColor: '#D50000', borderRadius: 10, paddingVertical: 15, alignItems: 'center' },
   botonDeshabilitado: { backgroundColor: '#E57373' },

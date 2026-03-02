@@ -17,20 +17,19 @@ import { Feather } from '@expo/vector-icons';
 import { obtenerSolicitudesRegistro, gestionarUsuario, obtenerResumen } from '../../services/adminService';
 import { enviarCorreoAutomatico } from '../../services/emailService';
 
-// --- MODAL DE CONFIRMACIÓN ---
-const ConfirmModal = ({ visible, tipo, nombre, onConfirm, onCancel, procesando }: any) => {
-  const esAceptar = tipo === 'aceptar';
+// --- MODAL DE CONFIRMACIÓN (SOLO PARA ACEPTAR) ---
+const ConfirmModal = ({ visible, nombre, onConfirm, onCancel, procesando }: any) => {
   return (
     <Modal transparent visible={visible} animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={[styles.modalIcon, { backgroundColor: esAceptar ? '#28A745' : '#DC3545' }]}>
-            <Feather name={esAceptar ? "check" : "x"} size={30} color="#FFF" />
+          <View style={[styles.modalIcon, { backgroundColor: '#28A745' }]}>
+            <Feather name="check" size={30} color="#FFF" />
           </View>
-          <Text style={styles.modalTitle}>{esAceptar ? 'Aceptar Usuario' : 'Rechazar Usuario'}</Text>
-          <Text style={styles.modalText}>
-            ¿Confirmas que deseas {esAceptar ? 'aceptar' : 'rechazar'} a <Text style={{fontWeight:'bold'}}>{nombre}</Text>?
-            {'\n'}Se intentará enviar un correo automático.
+          <Text style={styles.modalTitle} allowFontScaling={false}>Aceptar Usuario</Text>
+          <Text style={styles.modalText} allowFontScaling={false}>
+            ¿Confirmas que deseas aceptar a <Text style={{fontWeight:'bold'}}>{nombre}</Text>?
+            {'\n'}Se enviará un correo automático de bienvenida.
           </Text>
           
           {procesando ? (
@@ -38,13 +37,78 @@ const ConfirmModal = ({ visible, tipo, nombre, onConfirm, onCancel, procesando }
           ) : (
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.btnCancel} onPress={onCancel}>
-                <Text style={styles.btnCancelText}>Cancelar</Text>
+                <Text style={styles.btnCancelText} allowFontScaling={false}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btnConfirm, { backgroundColor: '#28A745' }]} onPress={onConfirm}>
+                <Text style={styles.btnConfirmText} allowFontScaling={false}>Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// --- NUEVO MODAL DE RECHAZO CON MOTIVOS ---
+const RechazoModal = ({ visible, nombre, onConfirm, onCancel, procesando, motivosSeleccionados, toggleMotivo }: any) => {
+  const opcionesRechazo = [
+    'Foto de perfil inapropiada o irreconocible',
+    'Nombre o datos personales no válidos',
+    'Cédula de identidad vencida o con datos incorrectos',
+    'Fecha de nacimiento no concuerda con la foto/cédula',
+    'Información general sospechosa o incompleta',
+    'Número de teléfono no válido',
+  ];
+
+  return (
+    <Modal transparent visible={visible} animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalRechazoContent}>
+          <View style={[styles.modalIcon, { backgroundColor: '#DC3545', alignSelf: 'center' }]}>
+            <Feather name="x" size={30} color="#FFF" />
+          </View>
+          <Text style={styles.modalTitle} allowFontScaling={false}>Rechazar Usuario</Text>
+          <Text style={styles.modalText} allowFontScaling={false}>
+            Selecciona los motivos por los que rechazas a <Text style={{fontWeight:'bold'}}>{nombre}</Text>:
+          </Text>
+
+          <ScrollView style={styles.opcionesContainer}>
+            {opcionesRechazo.map((opcion, index) => {
+              const seleccionado = motivosSeleccionados.includes(opcion);
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[styles.checkboxRow, seleccionado && styles.checkboxRowSelected]} 
+                  onPress={() => toggleMotivo(opcion)}
+                  activeOpacity={0.7}
+                >
+                  <Feather 
+                    name={seleccionado ? "check-square" : "square"} 
+                    size={22} 
+                    color={seleccionado ? "#DC3545" : "#666"} 
+                  />
+                  <Text style={[styles.checkboxText, seleccionado && styles.checkboxTextSelected]} allowFontScaling={false}>
+                    {opcion}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          
+          {procesando ? (
+            <ActivityIndicator size="small" color="#DC3545" style={{marginTop: 15}} />
+          ) : (
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.btnCancel} onPress={onCancel}>
+                <Text style={styles.btnCancelText} allowFontScaling={false}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.btnConfirm, { backgroundColor: esAceptar ? '#28A745' : '#DC3545' }]} 
+                style={[styles.btnConfirm, { backgroundColor: '#DC3545', opacity: motivosSeleccionados.length === 0 ? 0.5 : 1 }]} 
                 onPress={onConfirm}
+                disabled={motivosSeleccionados.length === 0}
               >
-                <Text style={styles.btnConfirmText}>{esAceptar ? 'Confirmar' : 'Rechazar'}</Text>
+                <Text style={styles.btnConfirmText} allowFontScaling={false}>Enviar Rechazo</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -62,9 +126,13 @@ export default function AdminSolicitudesScreen() {
   const [procesandoAccion, setProcesandoAccion] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [modalVisible, setModalVisible] = useState(false);
+  // Estados de Modales
+  const [modalAceptarVisible, setModalAceptarVisible] = useState(false);
+  const [modalRechazarVisible, setModalRechazarVisible] = useState(false);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<any>(null);
-  const [accionModal, setAccionModal] = useState<'aceptar' | 'rechazar'>('aceptar');
+  
+  // Estado para los motivos de rechazo
+  const [motivosRechazo, setMotivosRechazo] = useState<string[]>([]);
 
   const cargarDatos = async () => {
     try {
@@ -95,41 +163,55 @@ export default function AdminSolicitudesScreen() {
     setRefreshing(false);
   };
 
-  const abrirModal = (usuario: any, accion: 'aceptar' | 'rechazar') => {
+  const abrirModalAceptar = (usuario: any) => {
     setUsuarioSeleccionado(usuario);
-    setAccionModal(accion);
-    setModalVisible(true);
+    setModalAceptarVisible(true);
   };
 
-  const ejecutarAccion = async () => {
+  const abrirModalRechazar = (usuario: any) => {
+    setUsuarioSeleccionado(usuario);
+    setMotivosRechazo([]); // Limpiar motivos anteriores
+    setModalRechazarVisible(true);
+  };
+
+  const toggleMotivo = (motivo: string) => {
+    if (motivosRechazo.includes(motivo)) {
+      setMotivosRechazo(motivosRechazo.filter(m => m !== motivo));
+    } else {
+      setMotivosRechazo([...motivosRechazo, motivo]);
+    }
+  };
+
+  const ejecutarAccion = async (accion: 'aceptar' | 'rechazar') => {
     if (!usuarioSeleccionado) return;
     
     setProcesandoAccion(true);
     
     // 1. Actualizar en Firebase
-    const resultado = await gestionarUsuario(usuarioSeleccionado.id, usuarioSeleccionado.coleccion, accionModal);
+    const resultado = await gestionarUsuario(usuarioSeleccionado.id, usuarioSeleccionado.coleccion, accion);
     
     if (resultado.success) {
-      // 2. Enviar Correo Automático
-      // No bloqueamos si falla el correo, lo importante es que la base de datos se actualizó
+      // 2. Enviar Correo Automático (Pasando los motivos si es rechazo)
       enviarCorreoAutomatico(
         usuarioSeleccionado.email, 
         usuarioSeleccionado.nombres, 
-        accionModal === 'aceptar'
+        accion === 'aceptar',
+        accion === 'rechazar' ? motivosRechazo : undefined
       ).then((envioExitoso) => {
           if (!envioExitoso) {
               console.log("Advertencia: El correo no se pudo enviar, pero el usuario fue actualizado.");
           }
       });
       
-      setModalVisible(false);
-      await cargarDatos(); // Recargar lista
+      setModalAceptarVisible(false);
+      setModalRechazarVisible(false);
+      await cargarDatos(); 
       
-      // Mostrar éxito de la operación en BD
-      Alert.alert("Éxito", `Usuario ${accionModal === 'aceptar' ? 'aceptado' : 'rechazado'} correctamente.`);
+      Alert.alert("Éxito", `Usuario ${accion === 'aceptar' ? 'aceptado' : 'rechazado y notificado'} correctamente.`);
       
     } else {
-      setModalVisible(false);
+      setModalAceptarVisible(false);
+      setModalRechazarVisible(false);
       Alert.alert("Error", "No se pudo actualizar el usuario en la base de datos.");
     }
     
@@ -149,8 +231,6 @@ export default function AdminSolicitudesScreen() {
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.cardContentRow}>
-        
-        {/* LADO IZQUIERDO: INFO */}
         <View style={styles.leftSide}>
           <View style={styles.headerInfo}>
             <View style={styles.avatarContainer}>
@@ -161,9 +241,9 @@ export default function AdminSolicitudesScreen() {
               )}
             </View>
             <View style={{marginLeft: 10, flex: 1}}>
-              <Text style={styles.nombre} numberOfLines={1}>{item.nombres}</Text>
+              <Text style={styles.nombre} numberOfLines={1} allowFontScaling={false}>{item.nombres}</Text>
               <View style={[styles.badge, item.userType === 'alqui-amigo' ? styles.bgAzul : styles.bgCeleste]}>
-                <Text style={styles.badgeText}>
+                <Text style={styles.badgeText} allowFontScaling={false}>
                   {item.userType === 'alqui-amigo' ? 'Alqui-Amigo' : 'Cliente'}
                 </Text>
               </View>
@@ -173,33 +253,31 @@ export default function AdminSolicitudesScreen() {
           <View style={styles.detailsContainer}>
             <View style={styles.rowDetail}>
               <Feather name="activity" size={14} color="#666" />
-              <Text style={styles.detailText}> Nacimiento: {item.fechaNacimiento}</Text>
+              <Text style={styles.detailText} allowFontScaling={false}> Nacimiento: {item.fechaNacimiento}</Text>
             </View>
             <View style={styles.rowDetail}>
               <Feather name="credit-card" size={14} color="#666" />
-              <Text style={styles.detailText}> Cédula: {item.cedula}</Text>
+              <Text style={styles.detailText} allowFontScaling={false}> Cédula: {item.cedula}</Text>
             </View>
           </View>
         </View>
         
-        {/* LADO DERECHO: BOTONES */}
         <View style={styles.actionsContainer}>
           <View style={styles.topButtons}>
-            <TouchableOpacity style={styles.btnCheck} onPress={() => abrirModal(item, 'aceptar')}>
+            <TouchableOpacity style={styles.btnCheck} onPress={() => abrirModalAceptar(item)}>
               <Feather name="check" size={20} color="#FFF" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.btnCross} onPress={() => abrirModal(item, 'rechazar')}>
+            <TouchableOpacity style={styles.btnCross} onPress={() => abrirModalRechazar(item)}>
               <Feather name="x" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
           
           <TouchableOpacity style={styles.btnEye} onPress={() => irADetalleExtra(item)}>
             <Feather name="eye" size={18} color="#000" />
-            <Text style={styles.textVer}>Ver</Text>
+            <Text style={styles.textVer} allowFontScaling={false}>Ver</Text>
           </TouchableOpacity>
         </View>
-
       </View>
     </View>
   );
@@ -208,53 +286,63 @@ export default function AdminSolicitudesScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Panel Administrador</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>Panel Administrador</Text>
       </View>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.sectionTitle}>Solicitudes de registro</Text>
+        <Text style={styles.sectionTitle} allowFontScaling={false}>Solicitudes de registro</Text>
         
         {cargando ? (
           <ActivityIndicator size="large" color="#008FD9" />
         ) : solicitudes.length === 0 ? (
-          <Text style={styles.emptyText}>No hay solicitudes pendientes.</Text>
+          <Text style={styles.emptyText} allowFontScaling={false}>No hay solicitudes pendientes.</Text>
         ) : (
           solicitudes.map((item) => <View key={item.id}>{renderItem({ item })}</View>)
         )}
 
-        <Text style={styles.sectionTitle}>Resumen</Text>
+        <Text style={styles.sectionTitle} allowFontScaling={false}>Resumen</Text>
         
         <View style={styles.statsRow}>
           <View style={[styles.statCard, styles.bgCelesteLight]}>
             <Feather name="user-plus" size={24} color="#008FD9" />
-            <Text style={styles.statLabel}>Pendientes:</Text>
-            <Text style={styles.statNumber}>#{resumen.pendientes}</Text>
+            <Text style={styles.statLabel} allowFontScaling={false}>Pendientes:</Text>
+            <Text style={styles.statNumber} allowFontScaling={false}>#{resumen.pendientes}</Text>
           </View>
           <View style={[styles.statCard, styles.bgAzulLight]}>
             <Feather name="users" size={24} color="#0056b3" />
-            <Text style={styles.statLabel}>Alqui-Amigos:</Text>
-            <Text style={styles.statNumber}>#{resumen.alquiAmigos}</Text>
+            <Text style={styles.statLabel} allowFontScaling={false}>Alqui-Amigos:</Text>
+            <Text style={styles.statNumber} allowFontScaling={false}>#{resumen.alquiAmigos}</Text>
           </View>
         </View>
         
         <View style={[styles.statCard, styles.bgCelesteLight, { marginTop: 10, width: '48%' }]}>
             <Feather name="users" size={24} color="#008FD9" />
-            <Text style={styles.statLabel}>Clientes:</Text>
-            <Text style={styles.statNumber}>#{resumen.clientes}</Text>
+            <Text style={styles.statLabel} allowFontScaling={false}>Clientes:</Text>
+            <Text style={styles.statNumber} allowFontScaling={false}>#{resumen.clientes}</Text>
         </View>
-
       </ScrollView>
 
+      {/* Modal para Aceptar */}
       <ConfirmModal 
-        visible={modalVisible} 
-        tipo={accionModal} 
+        visible={modalAceptarVisible} 
         nombre={usuarioSeleccionado?.nombres} 
-        onConfirm={ejecutarAccion}
-        onCancel={() => setModalVisible(false)}
+        onConfirm={() => ejecutarAccion('aceptar')}
+        onCancel={() => setModalAceptarVisible(false)}
         procesando={procesandoAccion}
+      />
+
+      {/* Modal para Rechazar */}
+      <RechazoModal 
+        visible={modalRechazarVisible} 
+        nombre={usuarioSeleccionado?.nombres} 
+        onConfirm={() => ejecutarAccion('rechazar')}
+        onCancel={() => setModalRechazarVisible(false)}
+        procesando={procesandoAccion}
+        motivosSeleccionados={motivosRechazo}
+        toggleMotivo={toggleMotivo}
       />
     </View>
   );
@@ -293,14 +381,24 @@ const styles = StyleSheet.create({
   bgAzulLight: { backgroundColor: '#D0E1F9' },
   statLabel: { fontSize: 14, color: '#555', marginTop: 5 },
   statNumber: { fontSize: 18, fontWeight: 'bold', color: '#000' },
+  
+  // Modales
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: '#FFF', borderRadius: 15, padding: 25, alignItems: 'center' },
+  modalRechazoContent: { width: '90%', backgroundColor: '#FFF', borderRadius: 15, padding: 20, maxHeight: '80%' },
   modalIcon: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
   modalText: { textAlign: 'center', color: '#666', marginBottom: 20 },
   modalActions: { flexDirection: 'row', gap: 15, width: '100%', marginTop: 10 },
   btnCancel: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#EEE', alignItems: 'center' },
   btnConfirm: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
   btnCancelText: { fontWeight: 'bold', color: '#555' },
   btnConfirmText: { fontWeight: 'bold', color: '#FFF' },
+
+  // Opciones de Rechazo (Checkboxes)
+  opcionesContainer: { width: '100%', marginBottom: 10 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  checkboxRowSelected: { backgroundColor: '#FFF5F5' }, // Fondo rojito muy claro si está seleccionado
+  checkboxText: { flex: 1, marginLeft: 10, fontSize: 14, color: '#444' },
+  checkboxTextSelected: { color: '#DC3545', fontWeight: 'bold' }
 });

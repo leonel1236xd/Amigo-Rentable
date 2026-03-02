@@ -10,7 +10,9 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Modal,
-  StatusBar
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -46,13 +48,13 @@ const ModalMensaje: React.FC<ModalMensajeProps> = ({ visible, titulo, mensaje, t
               color="#FFFFFF" 
             />
           </View>
-          <Text style={styles.modalTitulo}>{titulo}</Text>
-          <Text style={styles.modalMensaje}>{mensaje}</Text>
+          <Text style={styles.modalTitulo} allowFontScaling={false}>{titulo}</Text>
+          <Text style={styles.modalMensaje} allowFontScaling={false}>{mensaje}</Text>
           <TouchableOpacity style={[
             styles.modalBoton,
             { backgroundColor: tipo === 'exito' ? '#28a745' : '#dc3545' }
           ]} onPress={onClose}>
-            <Text style={styles.modalBotonTexto}>Aceptar</Text>
+            <Text style={styles.modalBotonTexto} allowFontScaling={false}>Aceptar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -61,14 +63,13 @@ const ModalMensaje: React.FC<ModalMensajeProps> = ({ visible, titulo, mensaje, t
 };
 
 export default function UbicacionAlquiAmigoScreen() {
-  // Inicializamos router para poder navegar (si necesitas botón atrás)
   const router = useRouter(); 
   
   const [telefono, setTelefono] = useState('');
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [cargando, setCargando] = useState(true);
   
-  // Estados para el Modal
+  // Estados para el Modal de Mensaje
   const [modalVisible, setModalVisible] = useState(false);
   const [modalDatos, setModalDatos] = useState({
     titulo: '',
@@ -76,6 +77,11 @@ export default function UbicacionAlquiAmigoScreen() {
     tipo: 'error' as 'exito' | 'error',
     accion: () => {}
   });
+
+  // NUEVOS: Estados para el Modal de Tiempo
+  const [modalTiempoVisible, setModalTiempoVisible] = useState(false);
+  const [tiempoValor, setTiempoValor] = useState('');
+  const [tiempoUnidad, setTiempoUnidad] = useState<'minutos' | 'horas'>('minutos');
 
   const initialRegion = {
     latitude: -17.393835,
@@ -118,23 +124,41 @@ export default function UbicacionAlquiAmigoScreen() {
     setCargando(false);
   };
 
-  const compartirWhatsApp = () => {
+  // 1. ABRIR EL MODAL DE TIEMPO
+  const solicitarTiempoCompartir = () => {
     if (!telefono || telefono.length < 8) {
       mostrarModal('Número inválido', 'Por favor ingresa un número de teléfono válido.', 'error');
       return;
     }
-
     if (!location) {
       mostrarModal('Ubicación no lista', 'Aún estamos obteniendo tu ubicación exacta. Espera un momento.', 'error');
       return;
     }
+    setTiempoValor(''); // Limpiar input previo
+    setModalTiempoVisible(true); 
+  };
 
-    const lat = location.coords.latitude;
-    const long = location.coords.longitude;
-    // Generamos enlace directo a Google Maps
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
+  // 2. VALIDAR Y EJECUTAR EL ENVÍO A WHATSAPP
+  const procesarTiempoYCompartir = () => {
+    const valorNum = parseInt(tiempoValor);
+    if (isNaN(valorNum) || valorNum <= 0) {
+      mostrarModal('Tiempo inválido', 'Por favor ingresa un número válido mayor a 0.', 'error');
+      return;
+    }
+
+    setModalTiempoVisible(false); // Cerramos el modal
+
+    // Formatear texto (ej: "los próximos 20 minutos" o "las próximas 2 horas")
+    const articulo = tiempoUnidad === 'minutos' ? 'los próximos' : 'las próximas';
+    const tiempoTexto = `${articulo} ${valorNum} ${tiempoUnidad}`;
+
+    const lat = location!.coords.latitude;
+    const long = location!.coords.longitude;
     
-    const mensaje = `Hola, estoy compartiendo mi ubicación en tiempo real contigo: ${mapsUrl}`;
+    // Generamos enlace directo a Google Maps corregido (1 en lugar de 0)
+    const mapsUrl = `https://www.google.com/maps?q=$${lat},${long}`;
+    
+    const mensaje = `Hola, te comparto mi ubicación por seguridad durante ${tiempoTexto}. Puedes ver dónde estoy aquí: ${mapsUrl}`;
     
     // Limpiamos el número
     let numeroFinal = telefono.replace(/\s/g, ''); 
@@ -153,22 +177,17 @@ export default function UbicacionAlquiAmigoScreen() {
         
         {/* HEADER SIMPLE (Sin foto de perfil) */}
         <View style={styles.header}>
-          {/* Si quieres botón de atrás, descomenta esto: */}
-          {/* <TouchableOpacity onPress={() => router.back()} style={{position: 'absolute', left: 20, top: 60, zIndex: 10}}>
-            <Feather name="arrow-left" size={24} color="#000" />
-          </TouchableOpacity> */}
-          
-          <Text style={styles.headerTitle}>Compartir Ubicación</Text>
+          <Text style={styles.headerTitle} allowFontScaling={false}>Compartir Ubicación</Text>
         </View>
 
         <View style={styles.content}>
           {/* Descripción */}
-          <Text style={styles.description}>
+          <Text style={styles.description} allowFontScaling={false}>
             Comparte tu ubicación en tiempo real con un contacto de confianza para mayor seguridad durante tus encuentros.
           </Text>
 
           {/* Input Teléfono */}
-          <Text style={styles.labelInput}>Número de teléfono del contacto</Text>
+          <Text style={styles.labelInput} allowFontScaling={false}>Número de teléfono del contacto</Text>
           <TextInput
             style={styles.input}
             placeholder="Ej. +591 77788999"
@@ -179,15 +198,15 @@ export default function UbicacionAlquiAmigoScreen() {
           />
 
           {/* Botón Compartir */}
-          <TouchableOpacity style={styles.shareButton} onPress={compartirWhatsApp}>
+          <TouchableOpacity style={styles.shareButton} onPress={solicitarTiempoCompartir}>
             <Feather name="share-2" size={20} color="#FFF" style={{ marginRight: 10 }} />
-            <Text style={styles.shareButtonText}>Compartir Ubicación</Text>
+            <Text style={styles.shareButtonText} allowFontScaling={false}>Compartir Ubicación</Text>
           </TouchableOpacity>
 
           {/* Mapa */}
           <View style={styles.mapContainer}>
             {cargando ? (
-              <ActivityIndicator size="large" color="#007BFF" style={{ marginTop: 50 }} />
+              <ActivityIndicator size="large" color="#008FD9" style={{ marginTop: 50 }} />
             ) : (
               <MapView
                 style={styles.map}
@@ -232,7 +251,67 @@ export default function UbicacionAlquiAmigoScreen() {
           </View>
         </View>
 
-        {/* Componente Modal */}
+        {/* MODAL PARA SELECCIONAR TIEMPO (PERSONALIZADO) */}
+        <Modal animationType="slide" transparent={true} visible={modalTiempoVisible} onRequestClose={() => setModalTiempoVisible(false)}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : undefined} 
+            style={styles.modalTiempoOverlay}
+          >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.modalTiempoContainer}>
+                
+                <View style={styles.modalTiempoHeader}>
+                  <Text style={styles.modalTiempoTitulo} allowFontScaling={false}>Definir Tiempo</Text>
+                  <TouchableOpacity onPress={() => setModalTiempoVisible(false)}>
+                    <Feather name="x" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.modalTiempoSubtitulo} allowFontScaling={false}>
+                  ¿Por cuánto tiempo deseas compartir tu ubicación?
+                </Text>
+
+                {/* Input de número y selector de unidad */}
+                <View style={styles.inputTiempoRow}>
+                  <TextInput
+                    style={styles.inputTiempoNumero}
+                    keyboardType="numeric"
+                    placeholder="Ej. 30"
+                    placeholderTextColor="#999"
+                    value={tiempoValor}
+                    onChangeText={setTiempoValor}
+                    maxLength={2}
+                  />
+                  
+                  <View style={styles.selectorUnidadContainer}>
+                    <TouchableOpacity 
+                      style={[styles.btnUnidad, tiempoUnidad === 'minutos' && styles.btnUnidadActivo]}
+                      onPress={() => setTiempoUnidad('minutos')}
+                    >
+                      <Text style={[styles.txtUnidad, tiempoUnidad === 'minutos' && styles.txtUnidadActivo]} allowFontScaling={false}>Min</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.btnUnidad, tiempoUnidad === 'horas' && styles.btnUnidadActivo]}
+                      onPress={() => setTiempoUnidad('horas')}
+                    >
+                      <Text style={[styles.txtUnidad, tiempoUnidad === 'horas' && styles.txtUnidadActivo]} allowFontScaling={false}>Hrs</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Botón Confirmar Modal */}
+                <TouchableOpacity style={styles.btnConfirmarTiempo} onPress={procesarTiempoYCompartir}>
+                  <Feather name="send" size={20} color="#FFF" style={{ marginRight: 10 }} />
+                  <Text style={styles.txtConfirmarTiempo} allowFontScaling={false}>Compartir ahora</Text>
+                </TouchableOpacity>
+
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Componente Modal de Mensajes */}
         <ModalMensaje
           visible={modalVisible}
           titulo={modalDatos.titulo}
@@ -363,7 +442,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
   },
-  // --- ESTILOS DEL MODAL ---
+  // --- ESTILOS DEL MODAL (Mensajes) ---
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -415,4 +494,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+
+  // --- ESTILOS MODAL TIEMPO PERSONALIZADO ---
+  modalTiempoOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end',
+  },
+  modalTiempoContainer: {
+    backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25,
+    paddingBottom: Platform.OS === 'android' ? 85 : 25, 
+    elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1,
+  },
+  modalTiempoHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10,
+  },
+  modalTiempoTitulo: { fontSize: 22, fontWeight: 'bold', color: '#000' },
+  modalTiempoSubtitulo: { fontSize: 15, color: '#666', marginBottom: 20 },
+  
+  // Row Input + Selectores
+  inputTiempoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 30,
+  },
+  inputTiempoNumero: {
+    flex: 1, backgroundColor: '#F5F5F5', borderRadius: 12, padding: 18,
+    fontSize: 24, fontWeight: 'bold', color: '#000', textAlign: 'center',
+    borderWidth: 1, borderColor: '#E0E0E0',
+  },
+  selectorUnidadContainer: {
+    flexDirection: 'row', backgroundColor: '#F5F5F5', borderRadius: 12, padding: 4,
+    borderWidth: 1, borderColor: '#E0E0E0',
+  },
+  btnUnidad: {
+    paddingVertical: 14, paddingHorizontal: 15, borderRadius: 8,
+  },
+  btnUnidadActivo: {
+    backgroundColor: '#008FD9', elevation: 2,
+  },
+  txtUnidad: {
+    fontSize: 16, fontWeight: '600', color: '#666',
+  },
+  txtUnidadActivo: {
+    color: '#FFF',
+  },
+
+  // Botón Confirmar Modal
+  btnConfirmarTiempo: {
+    backgroundColor: '#007BFF', borderRadius: 12, paddingVertical: 16,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, elevation: 3,
+  },
+  txtConfirmarTiempo: {
+    color: '#FFF', fontSize: 18, fontWeight: 'bold',
+  }
 });

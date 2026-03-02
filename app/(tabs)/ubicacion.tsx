@@ -11,7 +11,9 @@ import {
   TouchableWithoutFeedback,
   Image,
   Modal,
-  StatusBar
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -20,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { auth } from '../../config/firebase'; 
 import { getUserData } from '../../services/authService';
 
-// --- COMPONENTE MODAL (Copiado de registro_usuarios.tsx) ---
+// --- COMPONENTE MODAL MENSAJE ---
 interface ModalMensajeProps {
   visible: boolean;
   titulo: string;
@@ -31,31 +33,22 @@ interface ModalMensajeProps {
 
 const ModalMensaje: React.FC<ModalMensajeProps> = ({ visible, titulo, mensaje, tipo, onClose }) => {
   return (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onClose}
-    >
+    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <View style={[
             styles.modalIconContainer, 
             { backgroundColor: tipo === 'exito' ? '#28a745' : '#dc3545' }
           ]}>
-            <Feather 
-              name={tipo === 'exito' ? 'check' : 'x'} 
-              size={32} 
-              color="#FFFFFF" 
-            />
+            <Feather name={tipo === 'exito' ? 'check' : 'x'} size={32} color="#FFFFFF" />
           </View>
-          <Text style={styles.modalTitulo}>{titulo}</Text>
-          <Text style={styles.modalMensaje}>{mensaje}</Text>
+          <Text style={styles.modalTitulo} allowFontScaling={false}>{titulo}</Text>
+          <Text style={styles.modalMensaje} allowFontScaling={false}>{mensaje}</Text>
           <TouchableOpacity style={[
             styles.modalBoton,
             { backgroundColor: tipo === 'exito' ? '#28a745' : '#dc3545' }
           ]} onPress={onClose}>
-            <Text style={styles.modalBotonTexto}>Aceptar</Text>
+            <Text style={styles.modalBotonTexto} allowFontScaling={false}>Aceptar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -65,22 +58,21 @@ const ModalMensaje: React.FC<ModalMensajeProps> = ({ visible, titulo, mensaje, t
 
 // --- PANTALLA PRINCIPAL ---
 export default function UbicacionScreen() {
-  const router = useRouter(); // Inicializamos el router
+  const router = useRouter();
   const [telefono, setTelefono] = useState('');
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [cargando, setCargando] = useState(true);
   
-  // Estado para el perfil del usuario (Header)
   const [clienteData, setClienteData] = useState<{ nombres: string; fotoURL: string } | null>(null);
 
-  // Estados para el Modal
+  // Estados para Modal de Mensaje
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalDatos, setModalDatos] = useState({
-    titulo: '',
-    mensaje: '',
-    tipo: 'error' as 'exito' | 'error',
-    accion: () => {}
-  });
+  const [modalDatos, setModalDatos] = useState({ titulo: '', mensaje: '', tipo: 'error' as 'exito' | 'error', accion: () => {} });
+
+  // Estados para el Modal de Tiempo
+  const [modalTiempoVisible, setModalTiempoVisible] = useState(false);
+  const [tiempoValor, setTiempoValor] = useState('');
+  const [tiempoUnidad, setTiempoUnidad] = useState<'minutos' | 'horas'>('minutos');
 
   const initialRegion = {
     latitude: -17.393835,
@@ -94,30 +86,18 @@ export default function UbicacionScreen() {
     obtenerUbicacion();
   }, []);
 
-  // Función para ir al perfil (Igual que en buscar.tsx)
-  const irAMiPerfil = () => {
-    router.push('/Perfil_usuario/perfil');
-  };
+  const irAMiPerfil = () => router.push('/Perfil_usuario/perfil');
 
-  // Función para mostrar el modal
   const mostrarModal = (titulo: string, mensaje: string, tipo: 'exito' | 'error', accion?: () => void) => {
-    setModalDatos({
-      titulo,
-      mensaje,
-      tipo,
-      accion: accion || (() => {})
-    });
+    setModalDatos({ titulo, mensaje, tipo, accion: accion || (() => {}) });
     setModalVisible(true);
   };
 
   const cerrarModal = () => {
     setModalVisible(false);
-    if (modalDatos.accion) {
-      modalDatos.accion();
-    }
+    if (modalDatos.accion) modalDatos.accion();
   };
 
-  // Lógica para cargar foto de perfil
   const cargarDatosUsuario = async () => {
     try {
       const user = auth.currentUser;
@@ -142,31 +122,46 @@ export default function UbicacionScreen() {
       setCargando(false);
       return;
     }
-
     let location = await Location.getCurrentPositionAsync({});
     setLocation(location);
     setCargando(false);
   };
 
-  const compartirWhatsApp = () => {
+  // 1. ABRIR EL MODAL DE TIEMPO
+  const solicitarTiempoCompartir = () => {
     if (!telefono || telefono.length < 8) {
-      mostrarModal('Número inválido', 'Por favor ingresa un número de teléfono válido para compartir tu ubicación.', 'error');
+      mostrarModal('Número inválido', 'Por favor ingresa un número de teléfono válido.', 'error');
       return;
     }
-
     if (!location) {
       mostrarModal('Ubicación no lista', 'Aún estamos obteniendo tu ubicación exacta. Espera un momento.', 'error');
       return;
     }
+    setTiempoValor(''); // Limpiar input previo
+    setModalTiempoVisible(true); 
+  };
 
-    const lat = location.coords.latitude;
-    const long = location.coords.longitude;
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${long}`;
+  // 2. VALIDAR Y EJECUTAR EL ENVÍO A WHATSAPP
+  const procesarTiempoYCompartir = () => {
+    const valorNum = parseInt(tiempoValor);
+    if (isNaN(valorNum) || valorNum <= 0) {
+      mostrarModal('Tiempo inválido', 'Por favor ingresa un número válido mayor a 0.', 'error');
+      return;
+    }
+
+    setModalTiempoVisible(false); // Cerramos el modal
+
+    // Formatear texto (ej: "los próximos 20 minutos" o "las próximas 2 horas")
+    const articulo = tiempoUnidad === 'minutos' ? 'los próximos' : 'las próximas';
+    const tiempoTexto = `${articulo} ${valorNum} ${tiempoUnidad}`;
+
+    const lat = location!.coords.latitude;
+    const long = location!.coords.longitude;
+    const mapsUrl = `https://www.google.com/maps?q=${lat},${long}`;
     
-    const mensaje = `Hola, estoy compartiendo mi ubicación en tiempo real contigo por seguridad: ${mapsUrl}`;
+    const mensaje = `Hola, te comparto mi ubicación por seguridad durante ${tiempoTexto}. Puedes ver dónde estoy aquí: ${mapsUrl}`;
     
     let numeroFinal = telefono.replace(/\s/g, ''); 
-    
     const url = `whatsapp://send?phone=${numeroFinal}&text=${encodeURIComponent(mensaje)}`;
 
     Linking.openURL(url).catch(() => {
@@ -179,15 +174,12 @@ export default function UbicacionScreen() {
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         
-        {/* HEADER (Con navegación al perfil) */}
+        {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Compartir Ubicación</Text>
+          <Text style={styles.headerTitle} allowFontScaling={false}>Compartir Ubicación</Text>
           <TouchableOpacity style={styles.botonPerfil} onPress={irAMiPerfil}>
             {clienteData?.fotoURL ? (
-              <Image 
-                source={{ uri: clienteData.fotoURL }} 
-                style={styles.fotoPerfilCliente} 
-              />
+              <Image source={{ uri: clienteData.fotoURL }} style={styles.fotoPerfilCliente} />
             ) : (
               <View style={styles.iconoPerfilContainer}>
                 <View style={styles.iconoPerfilUsuario}>
@@ -200,13 +192,11 @@ export default function UbicacionScreen() {
         </View>
 
         <View style={styles.content}>
-          {/* Descripción */}
-          <Text style={styles.description}>
+          <Text style={styles.description} allowFontScaling={false}>
             Comparte tu ubicación en tiempo real con un contacto de confianza para mayor seguridad durante tus encuentros.
           </Text>
 
-          {/* Input Teléfono */}
-          <Text style={styles.labelInput}>Número de teléfono del contacto</Text>
+          <Text style={styles.labelInput} allowFontScaling={false}>Número de teléfono del contacto</Text>
           <TextInput
             style={styles.input}
             placeholder="Ej. +591 77788999"
@@ -216,10 +206,9 @@ export default function UbicacionScreen() {
             onChangeText={setTelefono}
           />
 
-          {/* Botón Compartir */}
-          <TouchableOpacity style={styles.shareButton} onPress={compartirWhatsApp}>
+          <TouchableOpacity style={styles.shareButton} onPress={solicitarTiempoCompartir}>
             <Feather name="share-2" size={20} color="#FFF" style={{ marginRight: 10 }} />
-            <Text style={styles.shareButtonText}>Compartir Ubicación</Text>
+            <Text style={styles.shareButtonText} allowFontScaling={false}>Compartir Ubicación</Text>
           </TouchableOpacity>
 
           {/* Mapa */}
@@ -242,258 +231,174 @@ export default function UbicacionScreen() {
               >
                 {location && (
                   <Marker
-                    coordinate={{
-                      latitude: location.coords.latitude,
-                      longitude: location.coords.longitude,
-                    }}
+                    coordinate={{ latitude: location.coords.latitude, longitude: location.coords.longitude }}
                     title="Tu ubicación"
                     description="Aquí te encuentras ahora"
                   />
                 )}
               </MapView>
             )}
-            
-            {/* Controles Zoom (Visuales) */}
-            <View style={styles.zoomControls}>
-              <View style={styles.zoomButton}>
-                <Feather name="plus" size={24} color="#333" />
-              </View>
-              <View style={[styles.zoomButton, { marginTop: 1 }]}>
-                <Feather name="minus" size={24} color="#333" />
-              </View>
-            </View>
-
-            {/* Botón Navegación (Visual) */}
-            <View style={styles.navButton}>
-              <Feather name="navigation" size={24} color="#333" />
-            </View>
           </View>
         </View>
 
-        {/* Componente Modal */}
-        <ModalMensaje
-          visible={modalVisible}
-          titulo={modalDatos.titulo}
-          mensaje={modalDatos.mensaje}
-          tipo={modalDatos.tipo}
-          onClose={cerrarModal}
-        />
+        {/* MODAL PARA SELECCIONAR TIEMPO (AHORA PERSONALIZADO) */}
+        <Modal animationType="slide" transparent={true} visible={modalTiempoVisible} onRequestClose={() => setModalTiempoVisible(false)}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : undefined} 
+            style={styles.modalTiempoOverlay}
+          >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.modalTiempoContainer}>
+                
+                <View style={styles.modalTiempoHeader}>
+                  <Text style={styles.modalTiempoTitulo} allowFontScaling={false}>Definir Tiempo</Text>
+                  <TouchableOpacity onPress={() => setModalTiempoVisible(false)}>
+                    <Feather name="x" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.modalTiempoSubtitulo} allowFontScaling={false}>
+                  ¿Por cuánto tiempo deseas compartir tu ubicación?
+                </Text>
+
+                {/* Input de número y selector de unidad */}
+                <View style={styles.inputTiempoRow}>
+                  <TextInput
+                    style={styles.inputTiempoNumero}
+                    keyboardType="numeric"
+                    placeholder="Ej. 30"
+                    placeholderTextColor="#999"
+                    value={tiempoValor}
+                    onChangeText={setTiempoValor}
+                    maxLength={2}
+                  />
+                  
+                  <View style={styles.selectorUnidadContainer}>
+                    <TouchableOpacity 
+                      style={[styles.btnUnidad, tiempoUnidad === 'minutos' && styles.btnUnidadActivo]}
+                      onPress={() => setTiempoUnidad('minutos')}
+                    >
+                      <Text style={[styles.txtUnidad, tiempoUnidad === 'minutos' && styles.txtUnidadActivo]} allowFontScaling={false}>Min</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.btnUnidad, tiempoUnidad === 'horas' && styles.btnUnidadActivo]}
+                      onPress={() => setTiempoUnidad('horas')}
+                    >
+                      <Text style={[styles.txtUnidad, tiempoUnidad === 'horas' && styles.txtUnidadActivo]} allowFontScaling={false}>Hrs</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Botón Confirmar Modal */}
+                <TouchableOpacity style={styles.btnConfirmarTiempo} onPress={procesarTiempoYCompartir}>
+                  <Feather name="send" size={20} color="#FFF" style={{ marginRight: 10 }} />
+                  <Text style={styles.txtConfirmarTiempo} allowFontScaling={false}>Compartir ahora</Text>
+                </TouchableOpacity>
+
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Modal Mensaje */}
+        <ModalMensaje visible={modalVisible} titulo={modalDatos.titulo} mensaje={modalDatos.mensaje} tipo={modalDatos.tipo} onClose={cerrarModal} />
       </View>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  // --- ESTILOS DEL HEADER ---
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 15, backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#000000' },
   botonPerfil: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#000000',
-    overflow: 'hidden',
+    width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#FFFFFF',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#000000', overflow: 'hidden',
   },
-  fotoPerfilCliente: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-  },
-  iconoPerfilContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconoPerfilUsuario: {
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cabezaPerfil: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#000000',
-    marginBottom: 2,
-  },
-  cuerpoPerfil: {
-    width: 18,
-    height: 12,
-    borderTopLeftRadius: 9,
-    borderTopRightRadius: 9,
-    backgroundColor: '#000000',
-  },
-  // --- FIN ESTILOS HEADER ---
-
-  description: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    color: '#666',
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  labelInput: {
-    paddingHorizontal: 20,
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 10,
-  },
-  input: {
-    marginHorizontal: 20,
-    backgroundColor: '#EEE',
-    borderRadius: 10,
-    padding: 15,
-    fontSize: 16,
-    color: '#000',
-    marginBottom: 20,
-  },
+  fotoPerfilCliente: { width: 45, height: 45, borderRadius: 22.5 },
+  iconoPerfilContainer: { justifyContent: 'center', alignItems: 'center' },
+  iconoPerfilUsuario: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
+  cabezaPerfil: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#000000', marginBottom: 2 },
+  cuerpoPerfil: { width: 18, height: 12, borderTopLeftRadius: 9, borderTopRightRadius: 9, backgroundColor: '#000000' },
+  
+  description: { paddingHorizontal: 20, paddingTop: 20, color: '#666', fontSize: 15, lineHeight: 22, marginBottom: 20 },
+  labelInput: { paddingHorizontal: 20, fontSize: 16, fontWeight: 'bold', color: '#000', marginBottom: 10 },
+  input: { marginHorizontal: 20, backgroundColor: '#EEE', borderRadius: 10, padding: 15, fontSize: 16, color: '#000', marginBottom: 20 },
   shareButton: {
-    marginHorizontal: 20,
-    backgroundColor: '#008FD9',
-    borderRadius: 10,
-    paddingVertical: 15,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginHorizontal: 20, backgroundColor: '#008FD9', borderRadius: 10, paddingVertical: 15,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20,
     elevation: 3,
   },
-  shareButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  shareButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   mapContainer: {
-    flex: 1,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 15,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#DDD',
-    backgroundColor: '#FFF',
-    position: 'relative',
+    flex: 1, marginHorizontal: 20, marginBottom: 20, borderRadius: 15, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#DDD', backgroundColor: '#FFF',
   },
-  map: {
-    width: '100%',
-    height: '100%',
+  map: { width: '100%', height: '100%' },
+
+  // Estilos Modal General
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { width: '85%', backgroundColor: '#FFFFFF', borderRadius: 15, padding: 25, alignItems: 'center', elevation: 8 },
+  modalIconContainer: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  modalTitulo: { fontSize: 22, fontWeight: 'bold', color: '#333333', marginBottom: 12, textAlign: 'center' },
+  modalMensaje: { fontSize: 16, color: '#666666', textAlign: 'center', lineHeight: 24, marginBottom: 25 },
+  modalBoton: { width: '100%', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  modalBotonTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+
+  // --- ESTILOS MODAL TIEMPO PERSONALIZADO ---
+  modalTiempoOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end',
   },
-  zoomControls: {
-    position: 'absolute',
-    right: 15,
-    bottom: 60,
-    borderRadius: 8,
-    backgroundColor: '#FFF',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+  modalTiempoContainer: {
+    backgroundColor: '#FFF', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25,
+    paddingBottom: Platform.OS === 'android' ? 85 : 25, // <--- ARREGLO VISUAL DEL CORTE DE PANTALLA
+    elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1,
   },
-  zoomButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
+  modalTiempoHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10,
   },
-  navButton: {
-    position: 'absolute',
-    right: 15,
-    bottom: 15,
-    width: 40,
-    height: 40,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+  modalTiempoTitulo: { fontSize: 22, fontWeight: 'bold', color: '#000' },
+  modalTiempoSubtitulo: { fontSize: 15, color: '#666', marginBottom: 20 },
+  
+  // Row Input + Selectores
+  inputTiempoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 30,
   },
-  // --- ESTILOS DEL MODAL ---
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  inputTiempoNumero: {
+    flex: 1, backgroundColor: '#F5F5F5', borderRadius: 12, padding: 18,
+    fontSize: 24, fontWeight: 'bold', color: '#000', textAlign: 'center',
+    borderWidth: 1, borderColor: '#E0E0E0',
   },
-  modalContainer: {
-    width: '85%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    padding: 25,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  selectorUnidadContainer: {
+    flexDirection: 'row', backgroundColor: '#F5F5F5', borderRadius: 12, padding: 4,
+    borderWidth: 1, borderColor: '#E0E0E0',
   },
-  modalIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+  btnUnidad: {
+    paddingVertical: 14, paddingHorizontal: 15, borderRadius: 8,
   },
-  modalTitulo: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 12,
-    textAlign: 'center',
+  btnUnidadActivo: {
+    backgroundColor: '#008FD9', elevation: 2,
   },
-  modalMensaje: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 25,
+  txtUnidad: {
+    fontSize: 16, fontWeight: '600', color: '#666',
   },
-  modalBoton: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
+  txtUnidadActivo: {
+    color: '#FFF',
   },
-  modalBotonTexto: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+
+  // Botón Confirmar Modal
+  btnConfirmarTiempo: {
+    backgroundColor: '#007BFF', borderRadius: 12, paddingVertical: 16,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, elevation: 3,
   },
+  txtConfirmarTiempo: {
+    color: '#FFF', fontSize: 18, fontWeight: 'bold',
+  }
 });
