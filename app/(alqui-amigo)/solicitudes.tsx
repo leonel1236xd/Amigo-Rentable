@@ -9,7 +9,14 @@ import {
   StatusBar,
   RefreshControl,
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal,
+  ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -17,6 +24,108 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'fireb
 import { auth, db } from '../../config/firebase';
 import { enviarNotificacionPush, agendarRecordatorioLocal } from '../../services/notificationService';
 
+// --- MODAL DE CONFIRMACIÓN ACEPTAR ---
+const ConfirmAceptarModal = ({ visible, nombre, onConfirm, onCancel, procesando }: any) => (
+  <Modal transparent visible={visible} animationType="fade">
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        <View style={[styles.modalIcon, { backgroundColor: '#28A745' }]}>
+          <Feather name="check" size={30} color="#FFF" />
+        </View>
+        <Text style={styles.modalTitle} allowFontScaling={false}>Aceptar Solicitud</Text>
+        <Text style={styles.modalText} allowFontScaling={false}>
+          ¿Estás seguro de que deseas aceptar la solicitud de <Text style={{fontWeight:'bold'}}>{nombre}</Text>?
+        </Text>
+        {procesando ? (
+          <ActivityIndicator size="small" color="#28A745" style={{marginTop: 15}} />
+        ) : (
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.btnCancel} onPress={onCancel}>
+              <Text style={styles.btnCancelText} allowFontScaling={false}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.btnConfirm, { backgroundColor: '#28A745' }]} onPress={onConfirm}>
+              <Text style={styles.btnConfirmText} allowFontScaling={false}>Sí, aceptar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
+
+// --- MODAL DE RECHAZO CON MOTIVOS ---
+const RechazoModal = ({ visible, onConfirm, onCancel, procesando, motivosSeleccionados, toggleMotivo, motivoPersonalizado, setMotivoPersonalizado }: any) => {
+  const opciones = [
+    'El horario cruza con otra actividad',
+    'La ubicación me queda muy lejana',
+    'No me siento cómodo/a con el plan',
+    'La actividad no va con mis intereses'
+  ];
+
+  return (
+    <Modal transparent visible={visible} animationType="slide">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalRechazoContent}>
+            <View style={[styles.modalIcon, { backgroundColor: '#DC3545', alignSelf: 'center' }]}>
+              <Feather name="x-circle" size={30} color="#FFF" />
+            </View>
+            <Text style={styles.modalTitle} allowFontScaling={false}>Motivo del Rechazo</Text>
+            <Text style={styles.modalText} allowFontScaling={false}>
+              Elige los motivos (el cliente podrá verlos) o redacta uno:
+            </Text>
+
+            <ScrollView style={styles.opcionesContainer} showsVerticalScrollIndicator={false}>
+              {opciones.map((opcion, index) => {
+                const seleccionado = motivosSeleccionados.includes(opcion);
+                return (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={[styles.checkboxRow, seleccionado && styles.checkboxRowSelected]} 
+                    onPress={() => toggleMotivo(opcion)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name={seleccionado ? "check-square" : "square"} size={22} color={seleccionado ? "#DC3545" : "#666"} />
+                    <Text style={[styles.checkboxText, seleccionado && styles.checkboxTextSelected]} allowFontScaling={false}>{opcion}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              
+              {/* Input libre */}
+              <Text style={[styles.labelInput, { marginTop: 15 }]} allowFontScaling={false}>Otro motivo (Opcional):</Text>
+              <TextInput
+                style={styles.inputMotivo}
+                placeholder="Escribe un motivo específico..."
+                placeholderTextColor="#999"
+                value={motivoPersonalizado}
+                onChangeText={setMotivoPersonalizado}
+                multiline
+                maxLength={100}
+              />
+            </ScrollView>
+            
+            {procesando ? (
+              <ActivityIndicator size="small" color="#DC3545" style={{marginTop: 15}} />
+            ) : (
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.btnCancel} onPress={onCancel}>
+                  <Text style={styles.btnCancelText} allowFontScaling={false}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.btnConfirm, { backgroundColor: '#DC3545', opacity: (motivosSeleccionados.length === 0 && !motivoPersonalizado.trim()) ? 0.5 : 1 }]} 
+                  onPress={onConfirm}
+                  disabled={motivosSeleccionados.length === 0 && !motivoPersonalizado.trim()}
+                >
+                  <Text style={styles.btnConfirmText} allowFontScaling={false}>Enviar Rechazo</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
 
 interface SolicitudEntrante {
   id: string;
@@ -39,6 +148,16 @@ export default function SolicitudesAlquiAmigoScreen() {
   const [cargando, setCargando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // --- ESTADOS PARA LOS MODALES DE ACCIÓN ---
+  const [modalAceptarVisible, setModalAceptarVisible] = useState(false);
+  const [modalRechazarVisible, setModalRechazarVisible] = useState(false);
+  const [solicitudActiva, setSolicitudActiva] = useState<SolicitudEntrante | null>(null);
+  const [procesandoAccion, setProcesandoAccion] = useState(false);
+  
+  // Estados para el rechazo
+  const [motivosRechazo, setMotivosRechazo] = useState<string[]>([]);
+  const [motivoPersonalizado, setMotivoPersonalizado] = useState('');
+
   useFocusEffect(
     useCallback(() => {
       cargarSolicitudesEntrantes();
@@ -50,7 +169,6 @@ export default function SolicitudesAlquiAmigoScreen() {
     await cargarSolicitudesEntrantes();
     setRefreshing(false);
   };
-
 
   const ordenarSolicitudes = (lista: SolicitudEntrante[]) => {
     return lista.sort((a, b) => {
@@ -68,57 +186,21 @@ export default function SolicitudesAlquiAmigoScreen() {
     try {
       const user = auth.currentUser;
       if (!user) return;
-
-      const q = query(
-        collection(db, 'solicitudes'),
-        where('alqui_amigo_id', '==', user.uid)
-      );
-      
+      const q = query(collection(db, 'solicitudes'), where('alqui_amigo_id', '==', user.uid));
       const querySnapshot = await getDocs(q);
       const lista: SolicitudEntrante[] = [];
 
       await Promise.all(
         querySnapshot.docs.map(async (document) => {
           const data = document.data();
-          
-          
-          let clienteInfo: {
-            nombres: string;
-            fotoURL: string;
-            telefono: string;
-            email: string;
-            genero: string;
-            fechaNacimiento: string;
-            pushToken: string | null;
-          } = {
-            nombres: 'Usuario Desconocido',
-            fotoURL: '',
-            telefono: '',
-            email: 'No disponible',
-            genero: 'No especificado',
-            fechaNacimiento: '',
-            pushToken: null
-          };
-
+          let clienteInfo: any = { nombres: 'Usuario Desconocido', fotoURL: '', telefono: '', email: 'No disponible', genero: 'No especificado', fechaNacimiento: '', pushToken: null };
           try {
             const clienteDoc = await getDoc(doc(db, 'clientes', data.cliente_id));
             if (clienteDoc.exists()) {
               const cData = clienteDoc.data();
-              clienteInfo = {
-                nombres: cData.nombres || 'Usuario',
-                fotoURL: cData.fotoURL || '',
-                telefono: cData.telefono || '',
-                email: cData.email || 'No disponible',
-                genero: cData.genero || 'No especificado',
-                fechaNacimiento: cData.fechaNacimiento || '',
-                pushToken: null as string | null 
-              };
+              clienteInfo = { nombres: cData.nombres || 'Usuario', fotoURL: cData.fotoURL || '', telefono: cData.telefono || '', email: cData.email || 'No disponible', genero: cData.genero || 'No especificado', fechaNacimiento: cData.fechaNacimiento || '', pushToken: cData.pushToken || null };
             }
-          } catch (e) {
-            console.error("Error cargando cliente", e);
-          }
-
-          let estadoFinal = data.estado_solicitud;
+          } catch (e) { console.error(e); }
 
           lista.push({
             id: document.id,
@@ -126,24 +208,15 @@ export default function SolicitudesAlquiAmigoScreen() {
             nombreCliente: clienteInfo.nombres,
             fotoCliente: clienteInfo.fotoURL,
             telefonoCliente: clienteInfo.telefono,
-            clientePushToken: (clienteInfo as any).pushToken,
+            clientePushToken: clienteInfo.pushToken,
             lugar: data.lugar_asistir,
             fecha: data.fecha_salida,
             hora: data.hora_salida,
             duracion: data.duracion,
-            estado: estadoFinal,
-            
-
+            estado: data.estado_solicitud,
             datosCompletos: { 
               id: document.id,
-              // Datos del Cliente
-              nombreCliente: clienteInfo.nombres,
-              fotoCliente: clienteInfo.fotoURL,
-              telefonoCliente: clienteInfo.telefono,
-              email: clienteInfo.email,
-              genero: clienteInfo.genero,
-              fechaNacimiento: clienteInfo.fechaNacimiento,
-              // Datos de la Solicitud
+              ...clienteInfo,
               fecha: data.fecha_salida,
               hora: data.hora_salida,
               duracion: data.duracion,
@@ -153,21 +226,16 @@ export default function SolicitudesAlquiAmigoScreen() {
           });
         })
       );
-
-      const listaOrdenada = ordenarSolicitudes(lista);
-      setSolicitudes(listaOrdenada);
-
+      setSolicitudes(ordenarSolicitudes(lista));
     } catch (error) {
-      console.error("Error:", error);
+      console.error(error);
     } finally {
       setCargando(false);
     }
   };
 
-  // Función para programar recordatorio local
   const programarRecordatorio = (fechaStr: string, horaStr: string, nombreCliente: string) => {
     try {    
-      
       const [year, month, day] = fechaStr.split('-').map(Number);
       let [timePart, modifier] = horaStr.split(' ');
       let [hours, minutes] = timePart.split(':').map(Number);
@@ -180,114 +248,87 @@ export default function SolicitudesAlquiAmigoScreen() {
 
       const fechaEvento = new Date(year, month - 1, day, hours, minutes, 0);
       const ahora = new Date();
-
-      // Restar 30 minutos (30 * 60 * 1000 ms)
       const fechaRecordatorio = new Date(fechaEvento.getTime() - 30 * 60000);
-
-      // Calcular diferencia en segundos desde AHORA hasta el RECORDATORIO
       const segundosHastaRecordatorio = (fechaRecordatorio.getTime() - ahora.getTime()) / 1000;
 
       if (segundosHastaRecordatorio > 0) {
-        agendarRecordatorioLocal(
-          "⏰ Recordatorio de Salida",
-          `Tu encuentro con ${nombreCliente} comienza en 30 minutos. ¡Prepárate!`,
-          segundosHastaRecordatorio
-        );
-        console.log("Recordatorio programado para:", fechaRecordatorio);
-      } else {
-        console.log("Faltan menos de 30 mins o ya pasó, no se agenda recordatorio.");
+        agendarRecordatorioLocal("⏰ Recordatorio de Salida", `Tu encuentro con ${nombreCliente} comienza en 30 minutos. ¡Prepárate!`, segundosHastaRecordatorio);
       }
-
-    } catch (e) {
-      console.error("Error calculando fecha recordatorio:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  const cambiarEstado = async (id: string, nuevoEstado: 'aceptada' | 'rechazada') => {
-    
-    setSolicitudes(prev => {
-      const act = prev.map(s => s.id === id ? { ...s, estado: nuevoEstado } : s);
-      return ordenarSolicitudes(act);
-    });
+  // HANDLERS PARA ABRIR MODALES
+  const confirmarAceptar = (solicitud: SolicitudEntrante) => {
+    setSolicitudActiva(solicitud);
+    setModalAceptarVisible(true);
+  };
+
+  const confirmarRechazar = (solicitud: SolicitudEntrante) => {
+    setSolicitudActiva(solicitud);
+    setMotivosRechazo([]);
+    setMotivoPersonalizado('');
+    setModalRechazarVisible(true);
+  };
+
+  const toggleMotivo = (motivo: string) => {
+    if (motivosRechazo.includes(motivo)) setMotivosRechazo(motivosRechazo.filter(m => m !== motivo));
+    else setMotivosRechazo([...motivosRechazo, motivo]);
+  };
+
+  const ejecutarAccion = async (nuevoEstado: 'aceptada' | 'rechazada') => {
+    if (!solicitudActiva) return;
+    setProcesandoAccion(true);
+
+    let motivosFinales: string[] = [];
+    if (nuevoEstado === 'rechazada') {
+      motivosFinales = [...motivosRechazo];
+      if (motivoPersonalizado.trim()) motivosFinales.push(motivoPersonalizado.trim());
+    }
 
     try {
-      await updateDoc(doc(db, 'solicitudes', id), { estado_solicitud: nuevoEstado });
+      const updateData: any = { estado_solicitud: nuevoEstado };
+      if (nuevoEstado === 'rechazada') updateData.motivos_rechazo = motivosFinales; // Guardamos en BD
 
-      //Buscamos la solicitud en memoria
-      const solicitudEnMemoria = solicitudes.find(s => s.id === id);
-      
-      if (solicitudEnMemoria) {
-        
-        //LÓGICA DE RECORDATORIO
-        if (nuevoEstado === 'aceptada') {
-          programarRecordatorio(
-            solicitudEnMemoria.fecha, 
-            solicitudEnMemoria.hora, 
-            solicitudEnMemoria.nombreCliente
-          );
-        }
+      await updateDoc(doc(db, 'solicitudes', solicitudActiva.id), updateData);
 
-    
-        const clienteRef = doc(db, 'clientes', solicitudEnMemoria.cliente_id);
-        const clienteSnap = await getDoc(clienteRef);
-
-        if (clienteSnap.exists()) {
-          const datosCliente = clienteSnap.data();
-          const tokenDestino = datosCliente?.pushToken;
-
-          if (tokenDestino) {
-            let titulo = '';
-            let cuerpo = '';
-
-            if (nuevoEstado === 'aceptada') {
-              titulo = '¡Solicitud Aceptada! 🎉';
-              cuerpo = `El AlquiAmigo ha aceptado tu solicitud. Prepara tu salida.`;
-            } else {
-              titulo = 'Solicitud Rechazada';
-              cuerpo = `El AlquiAmigo no puede aceptar tu solicitud en este momento.`;
-            }
-
-            await enviarNotificacionPush(
-              tokenDestino,
-              titulo,
-              cuerpo,
-              { solicitudId: id, tipo: 'cambio_estado' }
-            );
-          }
-        }
+      if (nuevoEstado === 'aceptada') {
+        programarRecordatorio(solicitudActiva.fecha, solicitudActiva.hora, solicitudActiva.nombreCliente);
       }
 
+      // Notificación al Cliente
+      if (solicitudActiva.clientePushToken) {
+        let titulo = nuevoEstado === 'aceptada' ? '¡Solicitud Aceptada! 🎉' : 'Solicitud Rechazada';
+        let cuerpo = nuevoEstado === 'aceptada' 
+          ? `El AlquiAmigo ha aceptado tu solicitud. Prepara tu salida.` 
+          : `El AlquiAmigo no puede aceptar tu solicitud en este momento. Revisa los motivos en tus solicitudes.`;
+
+        await enviarNotificacionPush(solicitudActiva.clientePushToken, titulo, cuerpo, { solicitudId: solicitudActiva.id, tipo: 'cambio_estado' });
+      }
+
+      // Actualizar UI
+      setSolicitudes(prev => {
+        const act = prev.map(s => s.id === solicitudActiva.id ? { ...s, estado: nuevoEstado } : s);
+        return ordenarSolicitudes(act);
+      });
+
+      setModalAceptarVisible(false);
+      setModalRechazarVisible(false);
     } catch (error) {
       Alert.alert("Error", "No se pudo actualizar la solicitud.");
-      console.error("Error en cambiarEstado:", error);
-      cargarSolicitudesEntrantes(); 
+    } finally {
+      setProcesandoAccion(false);
     }
-  };
-
-  const irADetalles = (solicitud: any) => {
-    router.push({
-      pathname: '/(alqui-amigo)/detalle_solicitud',
-      params: { id: solicitud.id } 
-    });
   };
 
   const renderBadge = (estado: string) => {
-    let colorFondo = '#EEE';
-    let texto = estado.toUpperCase();
-    let colorTexto = '#555';
-
+    let colorFondo = '#EEE', texto = estado.toUpperCase(), colorTexto = '#555';
     switch (estado) {
       case 'pendiente': colorFondo = '#FF9800'; colorTexto = '#FFF'; texto = 'Pendiente'; break;
       case 'aceptada': colorFondo = '#28A745'; colorTexto = '#FFF'; texto = 'Aceptada'; break;
       case 'rechazada': colorFondo = '#DC3545'; colorTexto = '#FFF'; texto = 'Rechazada'; break;
       case 'concluida': colorFondo = '#6C757D'; colorTexto = '#FFF'; texto = 'Concluida'; break;
     }
-
-    return (
-      <View style={[styles.badge, { backgroundColor: colorFondo }]}>
-        <Text style={[styles.badgeText, { color: colorTexto }]}>{texto}</Text>
-      </View>
-    );
+    return <View style={[styles.badge, { backgroundColor: colorFondo }]}><Text style={[styles.badgeText, { color: colorTexto }]} allowFontScaling={false}>{texto}</Text></View>;
   };
 
   const renderItem = ({ item }: { item: SolicitudEntrante }) => (
@@ -295,32 +336,26 @@ export default function SolicitudesAlquiAmigoScreen() {
       <View style={styles.cardHeader}>
         <View style={styles.userInfo}>
           <View style={styles.avatarBorder}>
-            {item.fotoCliente ? (
-              <Image source={{ uri: item.fotoCliente }} style={styles.avatar} />
-            ) : (
-              <Feather name="user" size={24} color="#555" />
-            )}
+            {item.fotoCliente ? <Image source={{ uri: item.fotoCliente }} style={styles.avatar} /> : <Feather name="user" size={24} color="#555" />}
           </View>
           <View>
-            <Text style={styles.userName}>{item.nombreCliente}</Text>
-            <Text style={styles.userPhone}>
-              {item.telefonoCliente ? `+591 ${item.telefonoCliente}` : 'Sin teléfono'}
-            </Text>
+            <Text style={styles.userName} allowFontScaling={false}>{item.nombreCliente}</Text>
+            <Text style={styles.userPhone} allowFontScaling={false}>{item.telefonoCliente ? `+591 ${item.telefonoCliente}` : 'Sin teléfono'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.btnVerDetalles} onPress={() => irADetalles(item.datosCompletos)}>
-          <Text style={styles.txtVerDetalles}>Ver Detalles</Text>
+        <TouchableOpacity style={styles.btnVerDetalles} onPress={() => router.push({ pathname: '/(alqui-amigo)/detalle_solicitud', params: { id: item.id } })}>
+          <Text style={styles.txtVerDetalles} allowFontScaling={false}>Ver Detalles</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.cardBody}>
         <View style={styles.rowInfo}>
           <Feather name="calendar" size={16} color="#666" style={styles.iconInfo} />
-          <Text style={styles.textInfo}>{item.fecha}, {item.hora}</Text>
+          <Text style={styles.textInfo} allowFontScaling={false}>{item.fecha}, {item.hora}</Text>
         </View>
         <View style={styles.rowInfo}>
           <Feather name="map-pin" size={16} color="#666" style={styles.iconInfo} />
-          <Text style={styles.textInfo}>{item.lugar}</Text>
+          <Text style={styles.textInfo} allowFontScaling={false}>{item.lugar}</Text>
         </View>
       </View>
 
@@ -329,11 +364,11 @@ export default function SolicitudesAlquiAmigoScreen() {
           <View style={styles.footerPendiente}>
             {renderBadge('pendiente')}
             <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.btnAceptar} onPress={() => cambiarEstado(item.id, 'aceptada')}>
-                <Text style={styles.txtBtnAction}>Aceptar</Text>
+              <TouchableOpacity style={styles.btnAceptar} onPress={() => confirmarAceptar(item)}>
+                <Text style={styles.txtBtnAction} allowFontScaling={false}>Aceptar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnRechazar} onPress={() => cambiarEstado(item.id, 'rechazada')}>
-                <Text style={styles.txtBtnAction}>Rechazar</Text>
+              <TouchableOpacity style={styles.btnRechazar} onPress={() => confirmarRechazar(item)}>
+                <Text style={styles.txtBtnAction} allowFontScaling={false}>Rechazar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -350,7 +385,7 @@ export default function SolicitudesAlquiAmigoScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Solicitudes Recibidas</Text>
+        <Text style={styles.headerTitle} allowFontScaling={false}>Solicitudes Recibidas</Text>
       </View>
       {cargando ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#008FD9" /></View>
@@ -361,13 +396,32 @@ export default function SolicitudesAlquiAmigoScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>No tienes solicitudes nuevas.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText} allowFontScaling={false}>No tienes solicitudes nuevas.</Text>}
         />
       )}
+
+      {/* Modales de Acción */}
+      <ConfirmAceptarModal
+        visible={modalAceptarVisible}
+        nombre={solicitudActiva?.nombreCliente}
+        onConfirm={() => ejecutarAccion('aceptada')}
+        onCancel={() => setModalAceptarVisible(false)}
+        procesando={procesandoAccion}
+      />
+
+      <RechazoModal
+        visible={modalRechazarVisible}
+        onConfirm={() => ejecutarAccion('rechazada')}
+        onCancel={() => setModalRechazarVisible(false)}
+        procesando={procesandoAccion}
+        motivosSeleccionados={motivosRechazo}
+        toggleMotivo={toggleMotivo}
+        motivoPersonalizado={motivoPersonalizado}
+        setMotivoPersonalizado={setMotivoPersonalizado}
+      />
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
@@ -397,5 +451,27 @@ const styles = StyleSheet.create({
   txtBtnAction: { color: '#FFF', fontSize: 13, fontWeight: 'bold' },
   footerEstado: { alignItems: 'flex-start' },
   badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 12, fontWeight: 'bold' }
+  badgeText: { fontSize: 12, fontWeight: 'bold' },
+
+  // --- MODALES ESTILOS ---
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', backgroundColor: '#FFF', borderRadius: 15, padding: 25, alignItems: 'center' },
+  modalRechazoContent: { width: '90%', backgroundColor: '#FFF', borderRadius: 15, padding: 20, maxHeight: '85%' },
+  modalIcon: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
+  modalText: { textAlign: 'center', color: '#666', marginBottom: 20 },
+  modalActions: { flexDirection: 'row', gap: 15, width: '100%', marginTop: 10 },
+  btnCancel: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#EEE', alignItems: 'center' },
+  btnConfirm: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  btnCancelText: { fontWeight: 'bold', color: '#555' },
+  btnConfirmText: { fontWeight: 'bold', color: '#FFF' },
+
+  // Opciones Rechazo
+  opcionesContainer: { width: '100%', marginBottom: 10 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  checkboxRowSelected: { backgroundColor: '#FFF5F5' },
+  checkboxText: { flex: 1, marginLeft: 10, fontSize: 14, color: '#444' },
+  checkboxTextSelected: { color: '#DC3545', fontWeight: 'bold' },
+  labelInput: { fontSize: 14, fontWeight: 'bold', color: '#333', marginBottom: 5 },
+  inputMotivo: { backgroundColor: '#F5F5F5', borderRadius: 8, padding: 12, fontSize: 14, color: '#000', borderWidth: 1, borderColor: '#DDD', minHeight: 60, textAlignVertical: 'top' }
 });
